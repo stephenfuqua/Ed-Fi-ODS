@@ -2,7 +2,7 @@
 // Licensed to the Ed-Fi Alliance under one or more agreements.
 // The Ed-Fi Alliance licenses this file to you under the Apache License, Version 2.0.
 // See the LICENSE and NOTICES files in the project root for more information.
- 
+
 using System;
 using System.Data.SqlClient;
 using System.Linq;
@@ -26,9 +26,9 @@ namespace EdFi.Ods.Api.ExceptionHandling.Translators.SqlServer
             _databaseMetadataProvider = databaseMetadataProvider;
         }
 
-        public bool TryTranslateMessage(Exception ex, out RESTError webServiceError)
+        public bool TryTranslateMessage(Exception ex, out ExceptionTranslationResult translationResult)
         {
-            webServiceError = null;
+            translationResult = null;
 
             var exception = ex is GenericADOException
                 ? ex.InnerException
@@ -40,11 +40,9 @@ namespace EdFi.Ods.Api.ExceptionHandling.Translators.SqlServer
 
                 if (match.Success)
                 {
-                    string indexName = match.Groups["IndexName"]
-                                            .Value;
+                    string indexName = match.Groups["IndexName"].Value;
 
-                    string values = match.Groups["Values"]
-                                         .Value;
+                    string values = match.Groups["Values"].Value;
 
                     var indexDetails = _databaseMetadataProvider.GetIndexDetails(indexName);
 
@@ -58,11 +56,15 @@ namespace EdFi.Ods.Api.ExceptionHandling.Translators.SqlServer
 
                     var message = string.Format(MessageFormat, tableName, columnNames, values);
 
-                    webServiceError = new RESTError
-                                      {
-                                          Code = (int) HttpStatusCode.Conflict, Type = HttpStatusCode.Conflict.ToString(), Message = message
-                                      };
+                    var error = new RESTError
+                    {
+                        Code = (int) HttpStatusCode.Conflict,
+                        Type = HttpStatusCode.Conflict.ToString(),
+                        Message = message
+                    };
 
+                    translationResult = new ExceptionTranslationResult(error, ex);
+                    
                     return true;
                 }
             }

@@ -2,7 +2,7 @@
 // Licensed to the Ed-Fi Alliance under one or more agreements.
 // The Ed-Fi Alliance licenses this file to you under the Apache License, Version 2.0.
 // See the LICENSE and NOTICES files in the project root for more information.
- 
+
 using System;
 using System.Net;
 using EdFi.Ods.Common.Models.Resource;
@@ -18,17 +18,20 @@ namespace EdFi.Ods.Api.ExceptionHandling.Translators
         /// <param name="ex">The <see cref="Exception"/> to be translated.</param>
         /// <param name="webServiceError">The web service error response model.</param>
         /// <returns><b>true</b> if the exception was handled; otherwise <b>false</b>.</returns>
-        public bool TryTranslateMessage(Exception ex, out RESTError webServiceError)
+        public bool TryTranslateMessage(Exception ex, out ExceptionTranslationResult translationResult)
         {
-            webServiceError = null;
+            translationResult = null;
 
             if (ex is ProfileContentTypeException)
             {
-                webServiceError = new RESTError
-                                  {
-                                      Code = (int) HttpStatusCode.MethodNotAllowed, Type = HttpStatusCode.MethodNotAllowed.ToString(),
-                                      Message = ex.Message
-                                  };
+                var error = new RESTError
+                {
+                    Code = (int) HttpStatusCode.MethodNotAllowed,
+                    Type = HttpStatusCode.MethodNotAllowed.ToString(),
+                    Message = ex.Message
+                };
+
+                translationResult = new ExceptionTranslationResult(error, ex);
 
                 return true;
             }
