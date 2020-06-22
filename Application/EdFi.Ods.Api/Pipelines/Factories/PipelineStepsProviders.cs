@@ -2,7 +2,7 @@
 // Licensed to the Ed-Fi Alliance under one or more agreements.
 // The Ed-Fi Alliance licenses this file to you under the Apache License, Version 2.0.
 // See the LICENSE and NOTICES files in the project root for more information.
- 
+
 using System;
 using EdFi.Ods.Api.ChangeQueries.Pipelines.Steps;
 using EdFi.Ods.Api.Pipelines.Steps;
@@ -20,9 +20,11 @@ namespace EdFi.Ods.Api.Pipelines.Factories
         public Type[] GetSteps()
         {
             return new[]
-                   {
-                       typeof(GetEntityModelById<,,,>), typeof(DetectUnmodifiedEntityModel<,,,>), typeof(MapEntityModelToResourceModel<,,,>)
-                   };
+            {
+                typeof(GetEntityModelById<,,,>),
+                typeof(DetectUnmodifiedEntityModel<,,,>),
+                typeof(MapEntityModelToResourceModel<,,,>)
+            };
         }
     }
 
@@ -34,10 +36,10 @@ namespace EdFi.Ods.Api.Pipelines.Factories
         public Type[] GetSteps()
         {
             return new[]
-                   {
-                       typeof(MapResourceModelToEntityModel<,,,>),
-                       typeof(GetEntityModelsBySpecification<,,,>),
-                       typeof(MapEntityModelsToResourceModels<,,,>)
+            {
+                typeof(MapResourceModelToEntityModel<,,,>),
+                typeof(GetEntityModelsBySpecification<,,,>),
+                typeof(MapEntityModelsToResourceModels<,,,>)
             };
         }
     }
@@ -52,7 +54,7 @@ namespace EdFi.Ods.Api.Pipelines.Factories
             return new[]
             {
                 typeof(GetDeletedResourceModelByIds<,,>),
-                   };
+            };
         }
     }
 
@@ -64,9 +66,11 @@ namespace EdFi.Ods.Api.Pipelines.Factories
         public virtual Type[] GetSteps()
         {
             return new[]
-                   {
-                       typeof(ValidateResourceModel<,,,>), typeof(MapResourceModelToEntityModel<,,,>), typeof(PersistEntityModel<,,,>)
-                   };
+            {
+                typeof(ValidateResourceModel<,,,>),
+                typeof(MapResourceModelToEntityModel<,,,>),
+                typeof(PersistEntityModel<,,,>)
+            };
         }
     }
 
@@ -77,10 +81,7 @@ namespace EdFi.Ods.Api.Pipelines.Factories
     {
         public Type[] GetSteps()
         {
-            return new[]
-                   {
-                       typeof(DeleteEntityModel<,,,>)
-                   };
+            return new[] {typeof(DeleteEntityModel<,,,>)};
         }
     }
 }
