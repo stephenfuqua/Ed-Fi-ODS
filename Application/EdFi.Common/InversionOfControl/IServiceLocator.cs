@@ -2,7 +2,7 @@
 // Licensed to the Ed-Fi Alliance under one or more agreements.
 // The Ed-Fi Alliance licenses this file to you under the Apache License, Version 2.0.
 // See the LICENSE and NOTICES files in the project root for more information.
- 
+
 using System;
 
 namespace EdFi.Ods.Common.InversionOfControl
@@ -25,7 +25,7 @@ namespace EdFi.Ods.Common.InversionOfControl
         /// <typeparam name="T">The <see cref="Type"/> of the service.</typeparam>
         /// <returns>The service implementation.</returns>
         T Resolve<T>();
-        
+
         /// <summary>
         /// Locates and returns the named service implementing the type specified by the generic parameter.
         /// </summary>
