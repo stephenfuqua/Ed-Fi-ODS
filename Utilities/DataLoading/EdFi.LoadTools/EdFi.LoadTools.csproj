@@ -30,6 +30,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
-    <None Include="../../../LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
+    <None Include="../../NuGetArtifacts/LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
   </ItemGroup>
 </Project>
