@@ -24,6 +24,6 @@
     <ProjectReference Include="..\EdFi.Common\EdFi.Common.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="../../LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
+    <None Include="../NuGetArtifacts/LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
   </ItemGroup>
 </Project>
