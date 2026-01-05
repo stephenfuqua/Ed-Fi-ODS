@@ -42,14 +42,14 @@
       <MySourceDirectory Include="$(MSBuildProjectDirectory)\6.0.0\**\*" />
       <MyDestinationDirectory Include="$(MSBuildProjectDirectory)\" />
     </ItemGroup>
-    <Copy SourceFiles="@(MySourceDirectory)" DestinationFiles="@(MySourceDirectory-&gt;'$(MSBuildProjectDirectory)\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(MySourceDirectory)" DestinationFiles="@(MySourceDirectory->'$(MSBuildProjectDirectory)\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
   <Target Name="CopyDirectory" AfterTargets="AfterBuild" Condition=" '$(StandardVersion)' == '4.0.0' ">
     <ItemGroup>
       <MySourceDirectory Include="$(MSBuildProjectDirectory)\4.0.0\**\*" />
       <MyDestinationDirectory Include="$(MSBuildProjectDirectory)\" />
     </ItemGroup>
-    <Copy SourceFiles="@(MySourceDirectory)" DestinationFiles="@(MySourceDirectory-&gt;'$(MSBuildProjectDirectory)\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(MySourceDirectory)" DestinationFiles="@(MySourceDirectory->'$(MSBuildProjectDirectory)\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
   <ItemGroup>
     <PackageReference Include="ApprovalTests" />
