@@ -6,6 +6,7 @@
 name: Find Standard and Extension Versions
 
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       calling_branch:
@@ -49,7 +50,6 @@ jobs:
 
      - name: Set ExtensionVersions
        id: Set_ExtensionVersions
-       working-directory: ./Ed-Fi-Extensions/
        run: |
          $projectFile = Join-Path -Path "$env:GITHUB_WORKSPACE" -ChildPath "$env:EXTENSION_PATH"
          $output = .\build.githubactions.ps1 ExtensionVersions -ProjectFile "$projectFile"
