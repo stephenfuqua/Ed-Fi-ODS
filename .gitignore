@@ -46,7 +46,10 @@ _ReSharper.*
 packages/
 *.dll
 *.pdb
-*.XML
+
+# Fine-grained exlusion of XML files
+Ed-Fi-Extensions/**/Artifacts/**/*.xml
+**/Approval/**/*.xml
 *.nupkg
 
 # AppSettings
