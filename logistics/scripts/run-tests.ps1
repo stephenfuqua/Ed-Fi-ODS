@@ -12,7 +12,7 @@ if (Get-IsWindows) {
     $directorySeparatorChar += $directorySeparatorChar
 }
 
-$testAssemblies = (Get-ChildItem -recurse -File $((Ed-Fi-ODS) + "/*Tests.dll") | `
+$testAssemblies = (Get-ChildItem -recurse -File $((Get-RepositoryRoot "Ed-Fi-ODS") + "/*Tests.dll") | `
         Where-Object { $_.FullName -match "$($directorySeparatorChar)bin$($directorySeparatorChar)?" `
             -and $_.FullName -notmatch "$($directorySeparatorChar)net48$($directorySeparatorChar)?" `
             -and $_.fullName -notmatch "ApprovalTests.dll" `

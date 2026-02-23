@@ -93,7 +93,7 @@ function Invoke-Newman {
     $collectionFileDirectory = (Get-RepositoryResolvedPath "Postman Test Suite/")
     if ($isMultiTenancy.IsPresent) { $collectionFileDirectory = (Get-RepositoryResolvedPath "Postman Test Suite/Multitenancy") }
     $collectionFiles = Get-ChildItem $collectionFileDirectory -Filter "*.postman_collection.json"
-    $reportPath = "./reports/"
+    $reportPath = (Get-RepositoryRoot "Ed-Fi-ODS") + "/reports/"
 
     foreach ($collectionFile in $collectionFiles) {
         Write-host $script:environmentJson
@@ -110,7 +110,7 @@ function Invoke-Newman {
 function Invoke-PostmanIntegrationTests {
     $logPath = ((Get-ChildItem "$(Get-RepositoryResolvedPath "Application/EdFi.Ods.Api.IntegrationTestHarness")/bin/**/*")  | Select-Object -First 1).FullName
     if ($Null -eq $logPath) {
-        $logPath = "./"
+        $logPath = (Get-RepositoryRoot "Ed-Fi-Ods")
     }
     $logPath += "/PostmanIntegrationTestsLog.log"
 

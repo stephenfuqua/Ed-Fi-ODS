@@ -1,17 +1,19 @@
-BeforeAll { 
+BeforeAll {
     Import-Module "$PSScriptRoot/utility/cross-platform.psm1"
     Import-Module -Force -Scope Global ($PSCommandPath.Replace('.tests.ps1', '.psm1'))
 }
 Describe 'Select-RepositoryResolvedFiles' {
-    It 'Returns two valid and reachable paths' {
+    It 'Returns three valid and reachable paths' {
+        # logistics, ods-mssql, ods-postgresql
         $RepositoryFiles = Select-RepositoryResolvedFiles "logistics"
-        Test-Path $RepositoryFiles.FullName | Should -Be ($true, $true)
+        Test-Path $RepositoryFiles.FullName | Should -Be ($true, $true, $true)
     }
 }
 Describe 'Select-CumulativeRepositoryResolvedItems' {
-    It 'Returns two valid and reachable paths' {
+    It 'Returns three valid and reachable paths' {
+        # logistics, ods-mssql, ods-postgresql
         $RepositoryFiles = Select-CumulativeRepositoryResolvedItems "logistics"
-        Test-Path $RepositoryFiles.FullName | Should -Be ($true, $true)
+        Test-Path $RepositoryFiles.FullName | Should -Be ($true, $true, $true)
     }
 }
 
@@ -30,14 +32,16 @@ Describe 'Get-CorePath' {
 }
 Describe 'Get-RepositoryResolvedPath' {
     It 'Return paths to specified files, checking all repositories' {
-        Get-RepositoryResolvedPath
+        $path = Get-RepositoryResolvedPath
+        $path | Should -Not -BeNullOrEmpty
+        (Split-Path $path.Path -Leaf) | Should -Be "Ed-Fi-ODS"
     }
 }
 Describe 'Get-RepositoryRoot' {
     It 'Returns valid and reachable repository roots' {
         $getRepositoryRoot = Get-RepositoryRoot
+        (Split-Path $getRepositoryRoot[0] -Leaf) | Should -Be "Ed-Fi-ODS"
         Test-Path $getRepositoryRoot[0] | Should -Be $true
-        Test-Path $getRepositoryRoot[1] | Should -Be $true
     }
 }
 Describe 'Get-RepositoryNames' {

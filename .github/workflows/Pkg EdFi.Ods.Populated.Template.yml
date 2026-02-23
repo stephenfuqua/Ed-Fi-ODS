@@ -124,7 +124,7 @@ jobs:
     - name: Restore NuGet packages
       working-directory: ./Ed-Fi-ODS/
       run: |
-        .\build.githubactions.ps1 restore -Solution "$env:GITHUB_WORKSPACE/Ed-Fi-ODS/Application/Ed-Fi-Ods.sln"
+        .\build.githubactions.ps1 restore -Solution "./Application/Ed-Fi-Ods.sln"
       shell: pwsh
 
     - name: Initialize-DevelopmentEnvironment
@@ -133,7 +133,7 @@ jobs:
         $ErrorActionPreference = 'Stop'
         [Environment]::SetEnvironmentVariable('msbuild_buildConfiguration', '${{ env.CONFIGURATION }}')
         $PSVersionTable
-        . $env:GITHUB_WORKSPACE/Ed-Fi-ODS/Initialize-PowershellForDevelopment.ps1
+        . ./Initialize-PowershellForDevelopment.ps1
         Initialize-DevelopmentEnvironment  -NoDeploy  -NoRestore  -StandardVersion ${{ matrix.StandardVersion }} -ExtensionVersion ${{ matrix.ExtensionVersion }} -MssqlSaPassword ${{ env.DB_PASS }}
       shell: pwsh
 
@@ -154,7 +154,7 @@ jobs:
       run: |
         $ErrorActionPreference = 'Stop'
         [Environment]::SetEnvironmentVariable('msbuild_buildConfiguration', '${{ env.CONFIGURATION }}')
-        Import-Module -Force -Scope Global "$env:GITHUB_WORKSPACE/Ed-Fi-ODS/DatabaseTemplate/Modules/create-populated-template.psm1"
+        Import-Module -Force -Scope Global "./Ed-Fi-ODS/DatabaseTemplate/Modules/create-populated-template.psm1"
         Initialize-PopulatedTemplate -samplePath './Ed-Fi-Data-Standard/' -noExtensions -StandardVersion ${{ matrix.StandardVersion }}  -ExtensionVersion ${{ matrix.ExtensionVersion }} -LocalDbBackupDirectory /MssqlBackupVolume -DbServerBackupDirectory /DatabaseBackups
       shell: pwsh
 
@@ -166,7 +166,7 @@ jobs:
     - name: pack
       working-directory: ./Ed-Fi-ODS/
       run: |
-        .\build.githubactions.ps1 pack -Configuration ${{ env.CONFIGURATION }} -InformationalVersion ${{ env.INFORMATIONAL_VERSION }} -BuildCounter ${{ github.run_number }} -BuildIncrementer ${{env.BUILD_INCREMENTER}} -NuspecFilePath "$env:GITHUB_WORKSPACE/Ed-Fi-ODS/DatabaseTemplate/Database/EdFi.Ods.Populated.Template.Standard.${{ matrix.StandardVersion }}.nuspec" -PackageName  "EdFi.Suite3.Ods.Populated.Template.Standard.${{ matrix.StandardVersion }}"
+        .\build.githubactions.ps1 pack -Configuration ${{ env.CONFIGURATION }} -InformationalVersion ${{ env.INFORMATIONAL_VERSION }} -BuildCounter ${{ github.run_number }} -BuildIncrementer ${{env.BUILD_INCREMENTER}} -NuspecFilePath "./DatabaseTemplate/Database/EdFi.Ods.Populated.Template.Standard.${{ matrix.StandardVersion }}.nuspec" -PackageName  "EdFi.Suite3.Ods.Populated.Template.Standard.${{ matrix.StandardVersion }}"
       shell: pwsh
 
     - name: Install-credential-handler

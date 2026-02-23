@@ -91,8 +91,10 @@ jobs:
     - name: Restore NuGet packages
       run: |
         .\build.githubactions.ps1 restore -Solution "./Utilities/SdkGen/EdFi.SdkGen.sln"
-        .\build.githubactions.ps1 restore -Solution "./Application.sln"
+        .\build.githubactions.ps1 restore -Solution "./Application/Ed-Fi-Ods.sln"
       shell: pwsh
+
+    # SFTODO: should be able to create a single job to run everything above once, before the matrix of steps
 
     - name: ODS/API InitDev and SdkGen
       run: |
