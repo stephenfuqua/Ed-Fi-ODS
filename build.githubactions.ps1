@@ -89,7 +89,7 @@ param(
 
     [string]$RepoName,
 
-    [string]$BranchName
+    [string]$BranchName,
 
     [ValidateScript({
             if ($_ -match '^(?!0\.0\.0)\d+\.\d+\.\d+?$') {
@@ -345,15 +345,15 @@ function WorkflowCheck {
         Authorization = "Bearer $env:EDFI_ODS_TOKEN"
         Accept = "application/vnd.github.v3+json"
     }
-    
+
     $response = Invoke-RestMethod -Uri $Url -Headers $headers
-    
+
     if ( $response.workflow_runs.Count -gt 0) {
         Write-Host "Found workflow runs for URL: $Url."
-    
+
         $runTracker = @{}  # Create an empty hash table to track printed run_numbers
-    
-        $response.workflow_runs | Where-Object { $_.status -eq $ExpectedStatus -and $ExpectedConclusions -contains $_.conclusion } | 
+
+        $response.workflow_runs | Where-Object { $_.status -eq $ExpectedStatus -and $ExpectedConclusions -contains $_.conclusion } |
          Sort-Object -Property run_number -Descending | Select-Object -First 1| ForEach-Object {
             if (-not $runTracker.ContainsKey($_.run_number)) {
                 Write-Host "Run ID: $($_.id)"
@@ -365,7 +365,7 @@ function WorkflowCheck {
                 Write-Host "Created At: $($_.created_at)"
                 Write-Host "Updated At: $($_.updated_at)"
                 Write-Host "URL: $($_.html_url)"
-    
+
                 # Mark this run_number as printed
                 $runTracker[$_.run_number] = $true
                 echo "$StatusEnvName=true" >> $Env:GITHUB_ENV
@@ -401,7 +401,7 @@ function ComparePackageVersions {
     $branch_version = $json_branch.packages.$PackageName.PackageVersion
     $main_version = $json_main.packages.$PackageName.PackageVersion
 
-    # Convert versions to a comparable format 
+    # Convert versions to a comparable format
     $branch_version = [Version]$branch_version
     $main_version = [Version]$main_version
 
@@ -475,7 +475,7 @@ function CreateOrUpdateRepositoriesJson {
 
         # Find the repository entry or create a new one
         $repoEntry = $jsonContent.repositories | Where-Object { $_.repo_name -eq $RepoName }
-        
+
         Write-Host "Printing before checking where new  Commit ID exists or not "
         Get-Content $filePath | Write-Host
 
@@ -486,7 +486,7 @@ function CreateOrUpdateRepositoriesJson {
                 Write-Host "Printing before updating new Commit ID"
                 Get-Content $filePath | Write-Host
                 Write-Host "New commit ID   is different with old Commit Id "
-                $repoEntry.repo_name = $RepoName                
+                $repoEntry.repo_name = $RepoName
                 $repoEntry.commit_message = $commitMessage
                 $repoEntry.commit_id = $commitId
                 $repoEntry.IscommitChanged = 'true'
@@ -494,8 +494,8 @@ function CreateOrUpdateRepositoriesJson {
                 Write-Host "IscommitChanged is true."
             } else {
                 Write-Host "The commit ID for $RepoName is already up to date."
-                Write-Host "IscommitChanged is false."  
-                $repoEntry.IscommitChanged = 'false'                      
+                Write-Host "IscommitChanged is false."
+                $repoEntry.IscommitChanged = 'false'
             }
         } else {
             # Add new entry if the repository entry does not exist
@@ -507,11 +507,11 @@ function CreateOrUpdateRepositoriesJson {
             }
             $jsonContent.repositories += $newRepoEntry
             Write-Host "Added new repository entry for $RepoName."
-            Write-Host "IscommitChanged is true."         
+            Write-Host "IscommitChanged is true."
         }
     } else {
         # Create a new file with the initial content
-        Write-Host "File not Exists $FilePath .new file is created"        
+        Write-Host "File not Exists $FilePath .new file is created"
         $jsonContent = @{
             repositories = @(
                 @{
@@ -522,7 +522,7 @@ function CreateOrUpdateRepositoriesJson {
                 }
             )
         }
-        Write-Host "IscommitChanged is true." 
+        Write-Host "IscommitChanged is true."
     }
 
     # Write updated content back to the file
@@ -708,7 +708,7 @@ Invoke-Main {
         StandardVersions { Invoke-StandardVersions }
         WorkflowCheck { Invoke-WorkflowCheck }
         ComparePackageVersions { Invoke-ComparePackageVersions }
-        CreateOrUpdateRepositoriesJson { Invoke-CreateOrUpdateRepositoriesJson } 
+        CreateOrUpdateRepositoriesJson { Invoke-CreateOrUpdateRepositoriesJson }
         StandardTag { Invoke-StandardTag }
         TpdmTag { Invoke-TpdmTag }
         TriggerImplementationRepositoryWorkflows { TriggerImplementationRepositoryWorkflows }
