@@ -23,23 +23,18 @@ env:
 jobs:
   build:
 
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-    - name: Check for Azure token
-      if: ${{ env.REPOSITORY_OWNER == 'Ed-Fi-Alliance-OSS' && env.AZURE_ARTIFACT_NUGET_KEY == '' }}
-      run: |
-        echo "::error::Missing Azure Token"
-        exit 1
-
     - name: Install-credential-handler
-      run: iex "& { $(irm https://aka.ms/install-artifacts-credprovider.ps1) } -AddNetfx"
-      shell: powershell
+      if: ${{ env.AZURE_ARTIFACT_NUGET_KEY != '' &&  github.event_name == 'workflow_dispatch' }}
+      run: |
+        .\build.githubactions.ps1 InstallCredentialHandler
+      shell: pwsh
 
-    - name: build
-      if: ${{ env.AZURE_ARTIFACT_NUGET_KEY != '' }}
+    - name: Build and Publish
       run: |
         .\build-package.ps1 -InformationalVersion ${{env.INFORMATIONAL_VERSION}} -BuildCounter ${{ github.run_number }} -BuildIncrementer ${{env.BUILD_INCREMENTER}}  -NugetFeed ${{env.AZURE_ARTIFACT_URL}} -NuGetApiKey ${{ env.AZURE_ARTIFACT_NUGET_KEY }}
       shell: powershell
