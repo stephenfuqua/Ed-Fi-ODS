@@ -40,8 +40,19 @@ Describe 'Get-RepositoryResolvedPath' {
 Describe 'Get-RepositoryRoot' {
     It 'Returns valid and reachable repository roots' {
         $getRepositoryRoot = Get-RepositoryRoot
-        (Split-Path $getRepositoryRoot[0] -Leaf) | Should -Be "Ed-Fi-ODS"
-        Test-Path $getRepositoryRoot[0] | Should -Be $true
+
+        # Response could be an array or a string
+        if ($getRepositoryRoot -is [System.Array]) {
+            foreach ($path in $getRepositoryRoot) {
+                Test-Path $path | Should -Be $true
+                (Split-Path $path -Leaf) | Should -Be "Ed-Fi-ODS"
+            }
+        }
+        else {
+
+            Test-Path $getRepositoryRoot | Should -Be $true
+            (Split-Path $getRepositoryRoot -Leaf) | Should -Be "Ed-Fi-ODS"
+        }
     }
 }
 Describe 'Get-RepositoryNames' {
