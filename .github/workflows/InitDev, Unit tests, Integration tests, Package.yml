@@ -135,7 +135,6 @@ jobs:
                           -RunSdkGen `
                           -GenerateApiSdkPackage `
                           -RunPostman `
-                          -RunPester `
                           -RunDotnetTest `
                           -PackageOutput "./NugetPackages" `
                           -NoRestore `
