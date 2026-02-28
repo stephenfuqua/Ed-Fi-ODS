@@ -27,7 +27,7 @@ function Get-PluginScriptsFromSettings([hashtable] $Settings) {
 
     $scripts = $Settings.Plugin.Scripts
 
-    if ($null -eq $scripts) { return @() }
+    if ($null -eq $scripts -or $null -eq $Settings.ApiSettings -or [string]::IsNullOrWhiteSpace($Settings.ApiSettings.StandardVersion)) { return @() }
 
     if ([Version]::Parse($Settings.ApiSettings.StandardVersion) -ge [Version]::new(6,0,0)) {
         $scripts = $scripts | Where-Object { $_ -ne "tpdm" }
