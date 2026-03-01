@@ -22,8 +22,7 @@ param(
         "ExtensionVersions",
         "StandardVersions",
         "StandardTag",
-        "TpdmTag",
-        "TriggerImplementationRepositoryWorkflows")]
+        "TpdmTag")]
     $Command = "Build",
 
     [switch] $SelfContained,
@@ -98,8 +97,7 @@ param(
                 throw "Value '{0}' is an invalid version. Supply a valid version in the format 'X.Y.Z' where X, Y, and Z are non-zero digits."
             }
     })]
-    [string]  $ExtensionVersion
-
+    [string]$ExtensionVersion
 )
 
 $newRevision = ([int]$BuildCounter) + ([int]$BuildIncrementer)
@@ -379,9 +377,14 @@ function WorkflowCheck {
 }
 
 function ComparePackageVersions {
+    $repositoryName = $env:REPOSITORY_NAME
+    if ([string]::IsNullOrEmpty($repositoryName)) {
+         $repositoryName = "Ed-Fi-Alliance-OSS/Ed-Fi-ODS"
+    }
+
     # API URLs for branch and main
-    $url_branch = "https://api.github.com/repos/Ed-Fi-Alliance-OSS/Ed-Fi-ODS-Implementation/contents/configuration.packages.json?ref=$Env:current_branch"
-    $url_main = "https://api.github.com/repos/Ed-Fi-Alliance-OSS/Ed-Fi-ODS-Implementation/contents/configuration.packages.json?ref=main"
+    $url_branch = "https://api.github.com/repos/$repositoryName/contents/configuration.packages.json?ref=$Env:current_branch"
+    $url_main = "https://api.github.com/repos/$repositoryName/contents/configuration.packages.json?ref=main"
 
     $headers = @{
         Authorization = "Bearer $env:EDFI_ODS_TOKEN"
@@ -561,64 +564,6 @@ function RepositoryTag {
     return $versionTag
 }
 
-function TriggerImplementationRepositoryWorkflows {
-    <#
-    .SYNOPSIS
-        Searches for the corresponding PR in the Implementation repository; if found,
-        adds and removes a label to the PR, restarting all the PR workflows.
-        Note that the workflows must be configured to be triggered by the `unlabeled` pull_request event type.
-    #>
-
-    Assert-EnvironmentVariablesInitialized(@("current_branch", "REPOSITORY_OWNER", "EDFI_ODS_IMP_TOKEN"))
-
-    $headers = @{
-        Authorization = "Bearer $Env:EDFI_ODS_IMP_TOKEN"
-        Accept        = "application/vnd.github.v3+json"
-    }
-    $body = @{
-        state = "open"
-        head  = "${Env:REPOSITORY_OWNER}:${Env:current_branch}"
-    }
-    if ($Env:BASE_REF) {
-        $body.Add('base', $Env:BASE_REF)
-    }
-
-    Write-Host "Looking for a PR in the Implementation repository with the next parameters=$($body | ConvertTo-Json)."
-
-    $pr = Invoke-WebRequest `
-        -Uri "https://api.github.com/repos/$Env:REPOSITORY_OWNER/Ed-Fi-ODS/pulls" `
-        -Body $body `
-        -Headers $headers `
-    | ConvertFrom-Json `
-    | Select-Object -First 1
-
-    if (-not $pr.number) {
-        Write-Host "There's no matching PR."
-        return
-    }
-
-    Write-Host "Triggering workflows in the matching PR: https://github.com/Ed-Fi-Alliance-OSS/Ed-Fi-ODS/pull/$($pr.number)"
-
-    $label = "Trigger from ODS repo"
-    Invoke-WebRequest `
-        -Method Post `
-        -ContentType 'application/json' `
-        -Uri "https://api.github.com/repos/Ed-Fi-Alliance-OSS/Ed-Fi-ODS/issues/$($pr.number)/labels" `
-        -Body @(@{labels = @($label) } | ConvertTo-Json) `
-        -Headers $headers `
-    | Out-Null
-
-    Start-Sleep -Seconds 1
-
-    Invoke-WebRequest `
-        -Method Delete `
-        -Uri "https://api.github.com/repos/Ed-Fi-Alliance-OSS/Ed-Fi-ODS/issues/$($pr.number)/labels/$([uri]::EscapeDataString($label))" `
-        -Headers $headers `
-    | Out-Null
-
-    Write-Output "EXIT_STEP=true">> $Env:GITHUB_ENV
-}
-
 function Assert-EnvironmentVariablesInitialized {
     param (
         [Parameter(Mandatory = $true)]
@@ -711,7 +656,6 @@ Invoke-Main {
         CreateOrUpdateRepositoriesJson { Invoke-CreateOrUpdateRepositoriesJson }
         StandardTag { Invoke-StandardTag }
         TpdmTag { Invoke-TpdmTag }
-        TriggerImplementationRepositoryWorkflows { TriggerImplementationRepositoryWorkflows }
         default { throw "Command '$Command' is not recognized" }
     }
 }
