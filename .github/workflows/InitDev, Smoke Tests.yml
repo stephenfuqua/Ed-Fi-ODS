@@ -197,13 +197,13 @@ jobs:
                           -DbServerBackupDirectory /DatabaseBackups
 
 
-        if(Test-Path ./EUtilities/DataLoading/EdFi.SmokeTest.Console/bin/Release/net8.0/publish) {
-          Remove-Item -Path ./EUtilities/DataLoading/EdFi.SmokeTest.Console/bin/Release/net8.0/publish -Recurse
+        if(Test-Path ./Utilities/DataLoading/EdFi.SmokeTest.Console/bin/Release/net8.0/publish) {
+          Remove-Item -Path ./Utilities/DataLoading/EdFi.SmokeTest.Console/bin/Release/net8.0/publish -Recurse
         }
 
         $params = @{
                 testSets                 = @("NonDestructiveApi", "NonDestructiveSdk", "DestructiveSdk")
-                smokeTestDll             = "./EUtilities/SdkGen/EdFi.SdkGen.Console/csharp/src/EdFi.OdsApi.Sdk/bin/Release/net8.0/EdFi.OdsApi.Sdk.dll"
+                smokeTestDll             = "./Utilities/SdkGen/EdFi.SdkGen.Console/csharp/src/EdFi.OdsApi.Sdk/bin/Release/net8.0/EdFi.OdsApi.Sdk.dll"
                 testHarnessLogNamePrefix = "SmokeTestSandbox"
                 apiUrl = "http://localhost:8765/Tenant1"
                 isMultiTenancy = $true
