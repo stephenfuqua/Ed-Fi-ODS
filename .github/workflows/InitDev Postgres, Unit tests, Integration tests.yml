@@ -40,8 +40,6 @@ env:
 jobs:
   FindStandardAndExtensionVersions:
     uses: ./.github/workflows/Find Standard and Extension Versions.yml
-    with:
-      calling_branch: ${{ github.head_ref || github.ref_name }}
 
   # Pester does not need to run for each strategy in the matrix; and, it should fail fast - before initdev
   pwsh-tests:

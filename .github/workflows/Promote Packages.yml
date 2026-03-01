@@ -34,8 +34,6 @@ env:
 jobs:
   FindStandardAndExtensionVersions:
     uses: ./.github/workflows/Find Standard and Extension Versions.yml
-    with:
-      calling_branch: ${{ github.head_ref || github.ref_name }}
 
   build:
     needs: FindStandardAndExtensionVersions

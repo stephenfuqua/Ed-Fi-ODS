@@ -9,9 +9,6 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
-      calling_branch:
-        required: true
-        type: string
       extension_path:
         required: false
         default: 'Ed-Fi-Extensions/Extensions/EdFi.Ods.Extensions.TPDM/EdFi.Ods.Extensions.TPDM.csproj'
@@ -27,7 +24,6 @@ on:
 permissions: read-all
 
 env:
-  REF_NAME: ${{ inputs.calling_branch }}
   EXTENSION_PATH: ${{ inputs.extension_path }}
 
 jobs:
