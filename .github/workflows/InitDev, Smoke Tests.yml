@@ -55,6 +55,8 @@ jobs:
           --name mssql
           --user root
     runs-on: ubuntu-24.04
+    permissions:
+      checks: write
     strategy:
       fail-fast: false
       matrix:
