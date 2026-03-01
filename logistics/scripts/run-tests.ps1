@@ -12,7 +12,7 @@ if (Get-IsWindows) {
     $directorySeparatorChar += $directorySeparatorChar
 }
 
-$odsPath = (Get-RepositoryRoot "Ed-Fi-ODS").FullName
+$odsPath = Get-RepositoryRoot "Ed-Fi-ODS"
 
 $testAssemblies = (Get-ChildItem -recurse -File $($odsPath + "/*Tests.dll") | `
         Where-Object { $_.FullName -match "$($directorySeparatorChar)bin$($directorySeparatorChar)?" `
