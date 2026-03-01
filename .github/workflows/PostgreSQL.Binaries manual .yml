@@ -5,9 +5,9 @@
 
 
 # When to Use :
-   # 1.If Postgresql database version upgrade happens
-   # 2.If any code change happens in \Ed-Fi-ODS-Implementation\logistics\scripts folder
-   # 3.If Powershell upgrade major/minor version upgrade happens
+# 1. If Postgresql database version upgrade happens
+# 2. If any code change happens in logistics\scripts folder
+# 3. If Powershell upgrade major/minor version upgrade happens
 
 name: PostgreSQL.Binaries Manually triggered build
 
@@ -76,4 +76,4 @@ jobs:
       uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
       with:
         name: NugetPackages.Artifacts
-        path: ./Ed-Fi-ODS-Implementation/NugetPackages/PostgreSQL.Binaries.*.nupkg
+        path: ./NugetPackages/PostgreSQL.Binaries.*.nupkg

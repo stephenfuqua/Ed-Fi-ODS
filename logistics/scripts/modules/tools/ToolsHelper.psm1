@@ -98,9 +98,9 @@ function Install-DotNetTool {
     }
 
     $arguments = @(
-        $Name, 
-        "--version", $Version, 
-        "--tool-path", $Path, 
+        $Name,
+        "--version", $Version,
+        "--tool-path", $Path,
         "--no-cache"
     )
 
@@ -181,7 +181,7 @@ function Test-DotNetCore {
 
     try {
         $runtimes = Get-DotnetRuntimes
-        
+
         # This will check both runtimes for the specific major and greater than or equal to minor version
         # All Microsoft.AspNetCore.App runtimes equal to major and greater than or equal to minor version
         $validAsp = ($runtimes | Where-Object {$_.Runtime -eq "Microsoft.AspNetCore.App"} `
@@ -231,7 +231,7 @@ function Invoke-DbDeploy {
     An optional array of features (aka "sub types") to deploy.
 
 	.PARAMETER ToolsPath
-    Path where the dotnet tools are installed. Optional. Defaults to tools" under Ed-Fi-ODS-Implementation.
+    Path where the dotnet tools are installed. Optional. Defaults to `tools`.
 
     .EXAMPLE
     Deploy the ODS database with GrandBend and Sample extensions and with
@@ -243,9 +243,10 @@ function Invoke-DbDeploy {
         Database = "ODS"
         ConnectionString = "server=localhost;database=EdFi_Ods;integrated security=sspi"
         FilePaths = @(
-            "Ed-Fi-Ods/", "Ed-Fi-ODS/Application/EdFi.Ods.Standard",
-            "C:/Source/3.x/Ed-Fi-Ods-Implementation/Application/EdFi.Ods.Extensions.GrandBend/SupportingArtifacts/Database",
-            "C:/Source/3.x/Ed-Fi-Ods-Implementation/Application/EdFi.Ods.Extensions.Sample/SupportingArtifacts/Database"
+            "Ed-Fi-Ods/",
+            "Ed-Fi-ODS/Application/EdFi.Ods.Standard",
+            "C:/Source/3.x/Ed-Fi-Ods/Application/EdFi.Ods.Extensions.GrandBend/SupportingArtifacts/Database",
+            "C:/Source/3.x/Ed-Fi-Ods/Application/EdFi.Ods.Extensions.Sample/SupportingArtifacts/Database"
         )
         Features = @("Changes")
     }

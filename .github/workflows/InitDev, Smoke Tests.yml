@@ -13,12 +13,6 @@ on:
    types: [opened, synchronize, reopened, unlabeled]
   push:
    branches: [main, 'b-v*-patch*','feature-*']
-  workflow_dispatch:
-    inputs:
-      distinct_id:
-        description: 'distinct ID for Trgr InitDev workflows in Implementation repo workflow'
-        required: false
-        default: 'distinct_id'
 
 permissions: read-all
 
@@ -70,9 +64,6 @@ jobs:
 
     steps:
 
-    - name: echo distinct ID ${{ github.event.inputs.distinct_id }}
-      run:  echo "${{ github.event.inputs.distinct_id }}"
-
     - name: Set permissions for database server container backup directory
       run: docker exec --user root mssql chmod 777 /DatabaseBackups
       shell: pwsh
@@ -113,7 +104,7 @@ jobs:
         [int]$BuildCounter =  "${{ github.run_number }}"
         [int]$BuildIncrementer = "${{ env.BUILD_INCREMENTER }}"
         [int]$newRevision =  $BuildCounter + $BuildIncrementer
-        [string]$version = "${{ env.INFORMATIONAL_VERSION}}"+ "."+ $newRevision.ToString()
+        [string]$version = "${{ env.INFORMATIONAL_VERSION}}" + "." + $newRevision.ToString()
         .\build.github.ps1 -PackageVersion $version `
                           -RepositoryRoot $env:GITHUB_WORKSPACE `
                           -UsePlugins `
@@ -145,7 +136,7 @@ jobs:
         .\build.githubactions.ps1 Test -Configuration ${{ env.CONFIGURATION }} -Solution "./Utilities/DataLoading/LoadTools.sln" -TestFilter "RunManually"
       shell: pwsh
 
-    - name: ODS/API Smoke Test Sandbox
+    - name: ODS/API Single Tenant Smoke Tests
       run: |
         $ErrorActionPreference = 'Stop'
         . ./Initialize-PowershellForDevelopment.ps1
@@ -227,11 +218,10 @@ jobs:
       with:
         name: MultiTenant Smoke Tests Logs-${{ matrix.StandardVersion }}
         path: |
-          ./EUtilities/DataLoading/EdFi.SmokeTest.Console/bin/**/EdFi.SmokeTest.log
+          ./Utilities/DataLoading/EdFi.SmokeTest.Console/bin/**/EdFi.SmokeTest.log
           ./Application/EdFi.Ods.Api.IntegrationTestHarness/bin/**/SmokeTestSandbox.TestHarnessLog.log
 
     - name: ODS/API Postman Test MultiTenancy
-      working-directory: ./
       run: |
         $ErrorActionPreference = 'Stop'
         . ./Initialize-PowershellForDevelopment.ps1
@@ -251,7 +241,6 @@ jobs:
         name: MultiTenant Postman Tests
         path: ./reports/*.xml
         path-replace-backslashes: 'true'
-        working-directory: ./Ed-Fi-ODS-Implementation
         reporter: java-junit
 
     - name: Upload MultiTenancy Postman Tests Logs

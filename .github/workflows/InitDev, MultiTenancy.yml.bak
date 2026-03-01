@@ -193,7 +193,6 @@ jobs:
         name: MultiTenant Postman Tests
         path: ./reports/*.xml
         path-replace-backslashes: 'true'
-        working-directory: ./Ed-Fi-ODS-Implementation
         reporter: java-junit
 
     - name: Upload MultiTenancy Postman Tests Logs

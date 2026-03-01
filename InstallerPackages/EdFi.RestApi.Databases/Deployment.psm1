@@ -15,7 +15,7 @@ function Initialize-DeploymentEnvironment {
     .description
         Deploy databases from the EdFi.RestApi.Databases NuGet package created by ./prep-package.ps1
     .parameter PathResolverRepositoryOverride
-        A semicolon-separated string of repositories to pass to path-resolver, such as 'Ed-Fi-ODS;Ed-Fi-ODS-Implementation'
+        A semicolon-separated string of repositories to pass to path-resolver, such as 'Ed-Fi-ODS'
     .parameter InstallType
         The type of deployment to install: 'Sandbox', 'SingleTenant' or 'MultiTenant'
     .parameter Engine
