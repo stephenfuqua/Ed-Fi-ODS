@@ -187,3 +187,79 @@ jobs:
       with:
         name: NugetPackages.Artifacts-${{ matrix.StandardVersion }}
         path: ./NugetPackages/*TestSdk*.nupkg
+
+    - name: ODS/API MultiTenancy Smoke Tests
+      run: |
+        $ErrorActionPreference = 'Stop'
+        . ./Initialize-PowershellForDevelopment.ps1
+
+        .\build.github.ps1 -InstallType MultiTenant `
+                          -Tenants "Tenant1;Tenant2" `
+                          -RepositoryRoot $env:GITHUB_WORKSPACE `
+                          -UsePlugins `
+                          -NoPackaging `
+                          -NoRestore `
+                          -StandardVersion "${{ matrix.StandardVersion }}" `
+                          -ExtensionVersion "${{ matrix.ExtensionVersion }}" `
+                          -MssqlSaPassword "$env:DB_PASS" `
+                          -LocalDbBackupDirectory /MssqlBackupVolume `
+                          -DbServerBackupDirectory /DatabaseBackups
+
+
+        if(Test-Path ./EUtilities/DataLoading/EdFi.SmokeTest.Console/bin/Release/net8.0/publish) {
+          Remove-Item -Path ./EUtilities/DataLoading/EdFi.SmokeTest.Console/bin/Release/net8.0/publish -Recurse
+        }
+
+        $params = @{
+                testSets                 = @("NonDestructiveApi", "NonDestructiveSdk", "DestructiveSdk")
+                smokeTestDll             = "./EUtilities/SdkGen/EdFi.SdkGen.Console/csharp/src/EdFi.OdsApi.Sdk/bin/Release/net8.0/EdFi.OdsApi.Sdk.dll"
+                testHarnessLogNamePrefix = "SmokeTestSandbox"
+                apiUrl = "http://localhost:8765/Tenant1"
+                isMultiTenancy = $true
+        }
+
+        . ./logistics/scripts/run-smoke-tests.ps1 @params
+      shell: pwsh
+
+    - name: Upload MultiTenancy Smoke Tests Logs
+      if: success() || failure()
+      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
+      with:
+        name: MultiTenant Smoke Tests Logs-${{ matrix.StandardVersion }}
+        path: |
+          ./EUtilities/DataLoading/EdFi.SmokeTest.Console/bin/**/EdFi.SmokeTest.log
+          ./Application/EdFi.Ods.Api.IntegrationTestHarness/bin/**/SmokeTestSandbox.TestHarnessLog.log
+
+    - name: ODS/API Postman Test MultiTenancy
+      working-directory: ./
+      run: |
+        $ErrorActionPreference = 'Stop'
+        . ./Initialize-PowershellForDevelopment.ps1
+
+        Reset-TestAdminDatabase
+        Reset-TestSecurityDatabase
+        Reset-TestPopulatedTemplateDatabase
+
+        Write-FlatHashtable (Get-DeploymentSettings)
+        ./logistics/scripts/Invoke-PostmanIntegrationTests.ps1 -isMultiTenancy -configurationFile "./logistics/scripts/modules/postmanTestHarnessConfiguration-Multitenancy.json"
+      shell: pwsh
+
+    - name: Postman MultiTenancy Test Report
+      uses: dorny/test-reporter@31a54ee7ebcacc03a09ea97a7e5465a47b84aea5 # v1.9.1
+      if: success() || failure()
+      with:
+        name: MultiTenant Postman Tests
+        path: ./reports/*.xml
+        path-replace-backslashes: 'true'
+        working-directory: ./Ed-Fi-ODS-Implementation
+        reporter: java-junit
+
+    - name: Upload MultiTenancy Postman Tests Logs
+      if: success() || failure()
+      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
+      with:
+        name: MultiTenant Postman Tests Logs-${{ matrix.StandardVersion }}
+        path: |
+          ./Application/EdFi.Ods.Api.IntegrationTestHarness/bin/**/PostmanIntegrationTestsLog.log
+          ./Application/EdFi.Ods.Api.IntegrationTestHarness/bin/**/*TestHarnessRequestResponseDetailsLog.log
+          ./reports/*.html
