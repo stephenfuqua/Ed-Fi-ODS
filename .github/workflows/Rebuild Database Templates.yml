@@ -38,7 +38,7 @@ env:
   REF_NAME:  ${{ GITHUB.REF_NAME }}
   REPOSITORY_NAME: ${{ github.repository }}
   REPOSITORY_DISPATCH_BRANCH: ${{ github.event.client_payload.branch }}
-  EDFI_ODS_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
+  EDFI_ODS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   FindStandardAndExtensionVersions:
@@ -211,7 +211,7 @@ jobs:
         repo: ${{ github.repository }}
         branch: ${{ env.current_branch }}
       env:
-        GITHUB_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Pull latest changes from the remote repository
       run: git pull origin ${{ env.current_branch }}
