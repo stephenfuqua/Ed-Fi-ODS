@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: Apache-2.0
+# Licensed to the Ed-Fi Alliance under one or more agreements.
+# The Ed-Fi Alliance licenses this file to you under the Apache License, Version 2.0.
+# See the LICENSE and NOTICES files in the project root for more information.
+
+name: 'Dispatch Workflow and Get Run ID'
+description: 'Dispatches a workflow via workflow_dispatch, waits for completion, and returns its run ID'
+
+inputs:
+  workflow:
+    description: 'Workflow file name (e.g., Pkg EdFi.Ods.CodeGen.yml)'
+    required: true
+  ref:
+    description: 'Branch or ref to run the workflow on'
+    required: true
+  token:
+    description: 'GitHub token with actions:write permission'
+    required: true
+  repository:
+    description: 'Repository in owner/repo format'
+    required: true
+
+outputs:
+  run_id:
+    description: 'The run ID of the dispatched workflow'
+    value: ${{ steps.get_run_id.outputs.run_id }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Record dispatch time and trigger workflow
+      id: dispatch
+      shell: bash
+      run: |
+        dispatch_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        echo "dispatch_time=$dispatch_time" >> $GITHUB_OUTPUT
+        gh workflow run "${{ inputs.workflow }}" --ref "${{ inputs.ref }}" --repo "${{ inputs.repository }}"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    - name: Wait for run to be queued
+      shell: bash
+      run: sleep 20
+
+    - name: Get run ID
+      id: get_run_id
+      shell: bash
+      run: |
+        dispatch_time="${{ steps.dispatch.outputs.dispatch_time }}"
+        for i in {1..10}; do
+          run_id=$(gh run list \
+            --workflow "${{ inputs.workflow }}" \
+            --branch "${{ inputs.ref }}" \
+            --repo "${{ inputs.repository }}" \
+            --limit 5 \
+            --json databaseId,createdAt \
+            --jq "[.[] | select(.createdAt >= \"$dispatch_time\")][0].databaseId")
+          if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
+            echo "run_id=$run_id" >> $GITHUB_OUTPUT
+            echo "Found run ID: $run_id"
+            exit 0
+          fi
+          echo "Run not found yet, waiting 10s (attempt $i/10)"
+          sleep 10
+        done
+        echo "ERROR: Could not find the dispatched workflow run" >&2
+        exit 1
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    - name: Wait for workflow run to complete
+      shell: bash
+      run: |
+        gh run watch ${{ steps.get_run_id.outputs.run_id }} \
+          --repo "${{ inputs.repository }}" \
+          --exit-status
+      env:
+        GH_TOKEN: ${{ inputs.token }}

@@ -51,6 +51,7 @@ jobs:
 
     permissions:
       contents: write
+      actions: write
 
     steps:
 
@@ -170,8 +171,13 @@ jobs:
 
     - name: Dispatch EdFi.Ods.CodeGen workflow
       if: ${{ env.NoNewCommitsInAllThreeRepositories == 'false' || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.EdFi.Ods.CodeGen_package_alreadyupdated == 'false') }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.CodeGen.yml
       id: return_dispatch_codegen
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.CodeGen.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Download Codegen artifact using Run Id ${{ steps.return_dispatch_codegen.outputs.run_id }}
       if: ${{ env.NoNewCommitsInAllThreeRepositories == 'false' || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.EdFi.Ods.CodeGen_package_alreadyupdated == 'false') }}
@@ -290,28 +296,53 @@ jobs:
 
     - name: Dispatch EdFi.Ods.Profiles.Sample workflow
       if: ${{ ( env.NoNewCommitsInAllThreeRepositories == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates')) || ((env.NoNewCommitsInAllThreeRepositories == 'true' && env.Profiles_sample_package_alreadyupdated == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates'))) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Profiles.Sample.yml
       id: return_dispatch_profiles_sample
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Profiles.Sample.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Extensions.Homograph workflow
       if: ${{ ( env.NoNewCommitsInAllThreeRepositories == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates')) || ((env.NoNewCommitsInAllThreeRepositories == 'true' && env.Homograph_package_alreadyupdated == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates'))) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Extensions.Homograph.yml
       id: return_dispatch_homograph
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Extensions.Homograph.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch  EdFi.Ods.Extensions.Sample workflow
       if: ${{ ( env.NoNewCommitsInAllThreeRepositories == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates')) || ((env.NoNewCommitsInAllThreeRepositories == 'true' && env.Sample_package_alreadyupdated == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates'))) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Extensions.Sample.yml
       id: return_dispatch_sample
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Extensions.Sample.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch  EdFi.Ods.Extensions.SampleStudentTranscript workflow
       if: ${{ ( env.NoNewCommitsInAllThreeRepositories == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates')) || ((env.NoNewCommitsInAllThreeRepositories == 'true' && env.SampleStudentTranscript_package_alreadyupdated == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates'))) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Extensions.SampleStudentTranscript.yml
       id: return_dispatch_SampleStudentTranscript
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Extensions.SampleStudentTranscript.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch  EdFi.Ods.Extensions.TPDM worflow
       if: ${{ ( env.NoNewCommitsInAllThreeRepositories == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates')) || ((env.NoNewCommitsInAllThreeRepositories == 'true' && env.TPDM_package_alreadyupdated == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates'))) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Extensions.TPDM.yml
       id: return_dispatch_TPDM
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Extensions.TPDM.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Download EdFi.Ods.Profiles.Sample artifact using Run Id ${{ steps.return_dispatch_profiles_sample.outputs.run_id }}
       if: ${{ ( env.NoNewCommitsInAllThreeRepositories == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates')) || ((env.NoNewCommitsInAllThreeRepositories == 'true' && env.Profiles_sample_package_alreadyupdated == 'false' && (inputs.rebuildLevel == 'DotNetPackages' || inputs.rebuildLevel == 'DatabaseTemplates'))) }}
@@ -527,23 +558,43 @@ jobs:
 
     - name: Dispatch EdFi.Ods.Populated.Template workflow
       if: ${{ ((env.NoNewCommitsInAllThreeRepositories == 'false' && inputs.rebuildLevel == 'DatabaseTemplates') || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.populated_template_package_alreadyupdated == 'false' &&  inputs.rebuildLevel == 'DatabaseTemplates')) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Populated.Template.yml
       id: return_dispatch_populated_template
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Populated.Template.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Populated.Template.PostgreSQL workflow
       if: ${{ (( env.NoNewCommitsInAllThreeRepositories == 'false' && inputs.rebuildLevel == 'DatabaseTemplates') || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.populated_template_postgreSQL_package_alreadyupdated == 'false' &&  inputs.rebuildLevel == 'DatabaseTemplates')) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Populated.Template.PostgreSQL.yml
       id: return_dispatch_populated_template_postgresql
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Populated.Template.PostgreSQL.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Minimal.Template  workflow
       if: ${{ (( env.NoNewCommitsInAllThreeRepositories == 'false' && inputs.rebuildLevel == 'DatabaseTemplates') || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.minimal_template_package_alreadyupdated == 'false' &&  inputs.rebuildLevel == 'DatabaseTemplates')) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Minimal.Template.yml
       id: return_dispatch_minimal_template
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Minimal.Template.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Minimal.Template.PostgreSQL  workflow
       if: ${{ (( env.NoNewCommitsInAllThreeRepositories == 'false' && inputs.rebuildLevel == 'DatabaseTemplates') || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.minimal_template_postgreSQL_package_alreadyupdated == 'false' &&  inputs.rebuildLevel == 'DatabaseTemplates')) }}
-      uses: ./.github/workflows/Pkg EdFi.Ods.Minimal.Template.PostgreSQL.yml
       id: return_dispatch_minimal_template_postgresql
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Minimal.Template.PostgreSQL.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Download EdFi.Ods.Minimal.Template artifact using Run Id ${{ steps.return_dispatch_minimal_template.outputs.run_id }}
       if: ${{ (( env.NoNewCommitsInAllThreeRepositories == 'false' && inputs.rebuildLevel == 'DatabaseTemplates') || (env.NoNewCommitsInAllThreeRepositories == 'true' && env.minimal_template_package_alreadyupdated == 'false' &&  inputs.rebuildLevel == 'DatabaseTemplates')) }}
@@ -691,23 +742,43 @@ jobs:
 
     - name: Dispatch EdFi.Ods.Populated.Template.TPDM  workflow
       if: inputs.rebuildLevel == 'DatabaseTemplates'
-      uses: ./.github/workflows/Pkg EdFi.Ods.Populated.Template.TPDM.yml
       id: return_dispatch_populated_template_TPDM
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Populated.Template.TPDM.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Populated.Template.TPDM.PostgreSQL workflow
       if: inputs.rebuildLevel == 'DatabaseTemplates'
-      uses: ./.github/workflows/Pkg EdFi.Ods.Populated.Template.TPDM.PostgreSQL.yml
       id: return_dispatch_populated_template_TPDM_postgresql
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Populated.Template.TPDM.PostgreSQL.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Minimal.Template.TPDM  workflow
       if: inputs.rebuildLevel == 'DatabaseTemplates'
-      uses: ./.github/workflows/Pkg EdFi.Ods.Minimal.Template.TPDM.yml
       id: return_dispatch_minimal_template_TPDM
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Minimal.Template.TPDM.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Dispatch EdFi.Ods.Minimal.Template.TPDM.PostgreSQL  workflow
       if: inputs.rebuildLevel == 'DatabaseTemplates'
-      uses: ./.github/workflows/Pkg EdFi.Ods.Minimal.Template.TPDM.PostgreSQL.yml
       id: return_dispatch_minimal_template_TPDM_postgresql
+      uses: ./.github/actions/dispatch-workflow
+      with:
+        workflow: Pkg EdFi.Ods.Minimal.Template.TPDM.PostgreSQL.yml
+        ref: ${{ env.current_branch }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.REPOSITORY_NAME }}
 
     - name: Download EdFi.Ods.Minimal.Template.TPDM artifact using Run Id ${{ steps.return_dispatch_minimal_template_TPDM.outputs.run_id }}
       if: inputs.rebuildLevel == 'DatabaseTemplates'
