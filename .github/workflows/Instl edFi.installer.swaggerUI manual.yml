@@ -16,39 +16,37 @@ env:
   BUILD_INCREMENTER: ${{ vars.INSTALLER_SWAGGERUI_BUILD_INCREMENTER }}
   AZURE_ARTIFACT_URL: "https://pkgs.dev.azure.com/ed-fi-alliance/Ed-Fi-Alliance-OSS/_packaging/EdFi/nuget/v3/index.json"
   AZURE_ARTIFACT_NUGET_KEY: ${{ secrets.AZURE_ARTIFACTS_PERSONAL_ACCESS_TOKEN }}
-  VSS_NUGET_EXTERNAL_FEED_ENDPOINTS : '{"endpointCredentials": [{"endpoint": "https://pkgs.dev.azure.com/ed-fi-alliance/Ed-Fi-Alliance-OSS/_packaging/EdFi/nuget/v3/index.json","password": "${{ secrets.AZURE_ARTIFACTS_PERSONAL_ACCESS_TOKEN }}"}]}'
+  VSS_NUGET_EXTERNAL_FEED_ENDPOINTS: '{"endpointCredentials": [{"endpoint": "https://pkgs.dev.azure.com/ed-fi-alliance/Ed-Fi-Alliance-OSS/_packaging/EdFi/nuget/v3/index.json","password": "${{ secrets.AZURE_ARTIFACTS_PERSONAL_ACCESS_TOKEN }}"}]}'
   REPOSITORY_OWNER: ${{ GITHUB.REPOSITORY_OWNER }}
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-    - name: Check for Azure token
-      if: ${{ env.AZURE_ARTIFACT_NUGET_KEY == '' }}
-      run: |
-        echo "::error::Missing Azure Token"
-        exit 1
+      - name: Check for Azure token
+        if: ${{ env.AZURE_ARTIFACT_NUGET_KEY == '' }}
+        run: |
+          echo "::error::Missing Azure Token"
+          exit 1
 
-    - name: Install-credential-handler
-      if: ${{ env.AZURE_ARTIFACT_NUGET_KEY != '' &&  github.event_name == 'workflow_dispatch' }}
-      run: |
-        .\build.githubactions.ps1 InstallCredentialHandler
-      shell: pwsh
+      - name: Install-credential-handler
+        if: ${{ env.AZURE_ARTIFACT_NUGET_KEY != '' &&  github.event_name == 'workflow_dispatch' }}
+        run: |
+          .\build.githubactions.ps1 InstallCredentialHandler
+        shell: pwsh
 
-    - name: Build and Publish
-      run: |
-        .\build-package.ps1 -InformationalVersion ${{env.INFORMATIONAL_VERSION}} -BuildCounter ${{ github.run_number }} -BuildIncrementer ${{env.BUILD_INCREMENTER}}  -NugetFeed ${{env.AZURE_ARTIFACT_URL}} -NuGetApiKey ${{ env.AZURE_ARTIFACT_NUGET_KEY }}
+      - name: Build and Publish
+        run: |
+          .\build-package.ps1 -InformationalVersion ${{env.INFORMATIONAL_VERSION}} -BuildCounter ${{ github.run_number }} -BuildIncrementer ${{env.BUILD_INCREMENTER}}  -NugetFeed ${{env.AZURE_ARTIFACT_URL}} -NuGetApiKey ${{ env.AZURE_ARTIFACT_NUGET_KEY }}
         shell: pwsh
         working-directory: InstallerPackages/EdFi.Installer.SwaggerUI
 
-    - name: Upload EdFi.Installer.SwaggerUI Artifacts
-      if: success()
-      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
-      with:
-        name: NugetPackages.Artifacts
-        path: ${{ github.workspace }}/InstallerPackages/EdFi.Installer.SwaggerUI/EdFi.Suite3.Installer.SwaggerUI.*.nupkg
-
+      - name: Upload EdFi.Installer.SwaggerUI Artifacts
+        if: success()
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
+        with:
+          name: NugetPackages.Artifacts
+          path: ${{ github.workspace }}/InstallerPackages/EdFi.Installer.SwaggerUI/EdFi.Suite3.Installer.SwaggerUI.*.nupkg
