@@ -17,7 +17,12 @@ using NUnit.Framework;
 
 namespace EdFi.Ods.CodeGen.Tests.Approval;
 
-[UseReporter(typeof(DiffReporter), typeof(NUnit3Reporter), typeof(PowerShellClipboardReporter))]
+// Removed PowerShellClipboardReporter as it is not compatible with the CI
+// environment and is not needed for local development when using the diff
+// reporter. If a test fails, the diff reporter will show the differences between
+// the approved and received files, and the developer can use their preferred
+// method to update the approved files if necessary.
+[UseReporter(typeof(DiffReporter), typeof(NUnit3Reporter))]
 public abstract class ApprovalTestsBase<TVersionMetadata>
     where TVersionMetadata : IStandardVersionMetadata, new()
 {
@@ -36,8 +41,14 @@ public abstract class ApprovalTestsBase<TVersionMetadata>
 
         _approvalsFileNamePrefix = metadata.ApprovalsFileNamePrefix;
         _standardVersion = metadata.StandardVersion;
-        _extensionRepositoryExtensionsFolder = Path.Combine(ApprovalTestHelpers.OdsRepository, CodeRepositoryConventions.Extensions);
-        _odsRepositoryProjects = Path.Combine(ApprovalTestHelpers.OdsRepository, CodeRepositoryConventions.Application);
+        _extensionRepositoryExtensionsFolder = Path.Combine(
+            ApprovalTestHelpers.OdsRepository,
+            CodeRepositoryConventions.Extensions
+        );
+        _odsRepositoryProjects = Path.Combine(
+            ApprovalTestHelpers.OdsRepository,
+            CodeRepositoryConventions.Application
+        );
     }
 
     protected void CreateApprovedFiles()
@@ -60,12 +71,16 @@ public abstract class ApprovalTestsBase<TVersionMetadata>
                 "--ExtensionVersion",
                 "1.1.0",
                 "--StandardVersion",
-                _standardVersion
-            });
+                _standardVersion,
+            }
+        );
 
         if (returnCode == ReturnCodesConventions.Error)
         {
-            throw new Exception("An unexpected problem was encountered during code generation.", Program.LastException);
+            throw new Exception(
+                "An unexpected problem was encountered during code generation.",
+                Program.LastException
+            );
         }
     }
 
@@ -76,18 +91,49 @@ public abstract class ApprovalTestsBase<TVersionMetadata>
     {
         var files = new List<string>();
 
-        files.AddRange(Directory.GetFiles(_extensionRepositoryExtensionsFolder, GeneratedCs, SearchOption.AllDirectories).Where(filePath => filePath.Contains(_standardVersion)));
-        files.AddRange(Directory.GetFiles(_extensionRepositoryExtensionsFolder, GeneratedHbm, SearchOption.AllDirectories).Where(filePath => filePath.Contains(_standardVersion)));
-        files.AddRange(Directory.GetFiles(_odsRepositoryProjects, GeneratedSql, SearchOption.AllDirectories).Where(filePath => filePath.Contains(_standardVersion)));
-        files.AddRange(Directory.GetFiles(_odsRepositoryProjects, GeneratedCs, SearchOption.AllDirectories).Where(filePath => filePath.Contains(_standardVersion)));
-        files.AddRange(Directory.GetFiles(_odsRepositoryProjects, GeneratedHbm, SearchOption.AllDirectories).Where(filePath => filePath.Contains(_standardVersion)));
+        files.AddRange(
+            Directory
+                .GetFiles(
+                    _extensionRepositoryExtensionsFolder,
+                    GeneratedCs,
+                    SearchOption.AllDirectories
+                )
+                .Where(filePath => filePath.Contains(_standardVersion))
+        );
+        files.AddRange(
+            Directory
+                .GetFiles(
+                    _extensionRepositoryExtensionsFolder,
+                    GeneratedHbm,
+                    SearchOption.AllDirectories
+                )
+                .Where(filePath => filePath.Contains(_standardVersion))
+        );
+        files.AddRange(
+            Directory
+                .GetFiles(_odsRepositoryProjects, GeneratedSql, SearchOption.AllDirectories)
+                .Where(filePath => filePath.Contains(_standardVersion))
+        );
+        files.AddRange(
+            Directory
+                .GetFiles(_odsRepositoryProjects, GeneratedCs, SearchOption.AllDirectories)
+                .Where(filePath => filePath.Contains(_standardVersion))
+        );
+        files.AddRange(
+            Directory
+                .GetFiles(_odsRepositoryProjects, GeneratedHbm, SearchOption.AllDirectories)
+                .Where(filePath => filePath.Contains(_standardVersion))
+        );
 
         files.Sort();
 
         using var cleanup = NamerFactory.AsEnvironmentSpecificTest($"Standard.{_standardVersion}");
 
         Approvals.Verify(
-            string.Join('\n', files.Select(x => Path.GetRelativePath(ApprovalTestHelpers.RepositoryRoot, x)))
+            string.Join(
+                    '\n',
+                    files.Select(x => Path.GetRelativePath(ApprovalTestHelpers.RepositoryRoot, x))
+                )
                 .Replace('\\', '/') + '\n' // Unix uses forward slash directory separator and files are terminated with newline
         );
     }
@@ -117,7 +163,11 @@ public abstract class ApprovalTestsBase<TVersionMetadata>
         if (File.Exists(approvalFileInfo.SourcePath + ".bak"))
         {
             // restore the backup
-            File.Copy(approvalFileInfo.SourcePath + ".bak", approvalFileInfo.SourcePath, overwrite: true);
+            File.Copy(
+                approvalFileInfo.SourcePath + ".bak",
+                approvalFileInfo.SourcePath,
+                overwrite: true
+            );
             File.Delete(approvalFileInfo.SourcePath + ".bak");
         }
     }
@@ -128,9 +178,11 @@ public abstract class ApprovalTestsBase<TVersionMetadata>
         {
             string ext = Path.GetExtension(file.GeneratedName);
 
-            if (file.SourcePath.ToLower().Contains("obj")
+            if (
+                file.SourcePath.ToLower().Contains("obj")
                 || file.SourcePath.ToLower().Contains("bin")
-                || string.IsNullOrEmpty(ext))
+                || string.IsNullOrEmpty(ext)
+            )
             {
                 continue;
             }
@@ -142,9 +194,14 @@ public abstract class ApprovalTestsBase<TVersionMetadata>
                 case ".sql":
 
                     string destFileName = Path.Combine(
-                        ApprovalTestHelpers.OdsRepository
-                        , "Utilities", "CodeGeneration", "EdFi.Ods.CodeGen.Tests", "Approval", _standardVersion
-                        , $"{_approvalsFileNamePrefix}.Verify.{file.Scenario}.approved{ext}");
+                        ApprovalTestHelpers.OdsRepository,
+                        "Utilities",
+                        "CodeGeneration",
+                        "EdFi.Ods.CodeGen.Tests",
+                        "Approval",
+                        _standardVersion,
+                        $"{_approvalsFileNamePrefix}.Verify.{file.Scenario}.approved{ext}"
+                    );
 
                     Console.WriteLine("Copying file: {0} to {1}", file.SourcePath, destFileName);
 
