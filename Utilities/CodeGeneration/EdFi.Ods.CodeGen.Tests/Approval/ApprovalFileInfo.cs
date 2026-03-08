@@ -30,6 +30,7 @@ namespace EdFi.Ods.CodeGen.Tests.Approval
         private string CreateScenario(string sourcePath)
             => sourcePath
                 .Replace(_odsRepository, string.Empty)
+                .Replace("Ed-Fi-Extensions", string.Empty)
                 .Replace("/", "_")
                 .Replace("_Application_", string.Empty)
                 .Replace("_Extensions_", string.Empty)
