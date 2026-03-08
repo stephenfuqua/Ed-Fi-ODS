@@ -80,7 +80,7 @@ jobs:
       run: |
         $ErrorActionPreference = 'Stop'
         $solution = ".\Utilities\CodeGeneration\EdFi.Ods.CodeGen.sln"
-        $reports = "${{ github.workspace }}/reports/""
+        $reports = "${{ github.workspace }}/reports/"
         if (Test-Path $reports) {
             Remove-Item -Path $reports -Force -Recurse | Out-Null
         }
