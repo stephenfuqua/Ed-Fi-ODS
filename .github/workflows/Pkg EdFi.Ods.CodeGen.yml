@@ -80,7 +80,7 @@ jobs:
       run: |
         $ErrorActionPreference = 'Stop'
         $solution = ".\Utilities\CodeGeneration\EdFi.Ods.CodeGen.sln"
-        $reports = ".\reports\"
+        $reports = "${{ github.workspace }}/reports/""
         if (Test-Path $reports) {
             Remove-Item -Path $reports -Force -Recurse | Out-Null
         }
@@ -111,11 +111,11 @@ jobs:
       uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
       with:
         name: NugetPackage.Artifacts
-        path: ./Ed-Fi-ODS/NugetPackages/*.nupkg
+        path: ./NugetPackages/*.nupkg
 
     - name: Upload test reports
       if: always()
       uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5
       with:
         name: TestReports
-        path: ./Ed-Fi-ODS/reports/*.*
+        path: ./reports/*.*
