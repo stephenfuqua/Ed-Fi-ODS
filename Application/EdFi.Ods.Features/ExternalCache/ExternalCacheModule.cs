@@ -131,16 +131,8 @@ namespace EdFi.Ods.Features.ExternalCache
         {
             if (IsProviderSelected())
             {
-                builder.RegisterType<RedisConnectionProvider>()
-                    .WithParameter(
-                        new ResolvedParameter(
-                            (p, c) => p.Name == "configuration",
-                            (p, c) =>
-                            {
-                                var apiSettings = c.Resolve<ApiSettings>();
-
-                                return apiSettings.Services.Redis.Configuration;
-                            }))
+                builder.Register(
+                        c => new RedisConnectionProvider(c.Resolve<ApiSettings>().Services.Redis))
                     .As<IRedisConnectionProvider>()
                     .SingleInstance();
 

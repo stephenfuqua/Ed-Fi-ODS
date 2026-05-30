@@ -4,10 +4,10 @@
 // See the LICENSE and NOTICES files in the project root for more information.
 
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using EdFi.Ods.Api.Caching;
 using EdFi.Ods.Features.Services.Redis;
+using log4net;
 using StackExchange.Redis;
 
 namespace EdFi.Ods.Features.ExternalCache.Redis;
@@ -25,6 +25,7 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
     private readonly TimeSpan? _slidingExpirationPeriod;
 
     private readonly IDatabase _cache;
+    private readonly ILog _logger = LogManager.GetLogger(typeof(RedisMapCache<,,>).Name);
 
     protected RedisMapCache(
         IRedisConnectionProvider redisConnectionProvider,
@@ -37,6 +38,11 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
         _cache = redisConnectionProvider.Get();
     }
 
+    /// <summary>
+    /// Sets one or more map entries for the specified cache key.
+    /// </summary>
+    /// <param name="key">The cache key.</param>
+    /// <param name="mapEntries">The map entries to store.</param>
     public async Task SetMapEntriesAsync(TKey key, (TMapKey key, TMapValue value)[] mapEntries)
     {
         // Maximum number of items per batch
@@ -44,139 +50,159 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
 
         ValidateKey(key);
 
-        if (mapEntries == null || mapEntries.Length == 0)
+        if (mapEntries is null || mapEntries.Length == 0)
         {
             return;
         }
 
-        var hashEntries = mapEntries
-            .Select(entry =>
-            {
-                if (!TryParse(entry.key, out RedisValue redisHashKey))
-                {
-                    throw new ArgumentException($"Unable to convert '{nameof(entry.key)}' of type '{typeof(TMapKey).Name}' to a '{nameof(RedisValue)}'.");
-                }
+        var hashEntries = new HashEntry[mapEntries.Length];
 
-                if (!TryParse(entry.value, out RedisValue redisHashValue))
-                {
-                    throw new ArgumentException($"Unable to convert '{nameof(entry.value)}' of type '{typeof(TMapKey).Name}' to a '{nameof(RedisValue)}'.");
-                }
-
-                return new HashEntry(redisHashKey, redisHashValue);
-            })
-            .ToArray();
+        for (int i = 0; i < mapEntries.Length; i++)
+        {
+            hashEntries[i] = new HashEntry(
+                ConvertMapKeyToRedisValue(mapEntries[i].key),
+                ConvertMapValueToRedisValue(mapEntries[i].value));
+        }
 
         string cacheKey = GetCacheKey(key);
 
         // Break the hash entries into batches and send each batch separately to avoid the ~1M parameter limit for Redis commands
         for (int i = 0; i < hashEntries.Length; i += BatchSize)
         {
-            var batchEntries = hashEntries.Skip(i).Take(BatchSize).ToArray();
-            await _cache.HashSetAsync(cacheKey, batchEntries);
-        }
+            int remaining = hashEntries.Length - i;
+            int currentBatchSize = Math.Min(BatchSize, remaining);
+            var batchEntries = new HashEntry[currentBatchSize];
+            Array.Copy(hashEntries, i, batchEntries, 0, currentBatchSize);
+            bool isLastBatch = i + currentBatchSize >= hashEntries.Length;
+            var batch = _cache.CreateBatch();
+            var setTask = batch.HashSetAsync(cacheKey, batchEntries);
+            Task<bool> expireTask = isLastBatch ? ApplyInitialExpirationBatched(batch, cacheKey) : null;
+            batch.Execute();
+            await setTask;
 
-        // Handle initial expiration
-        ApplyInitialExpiration(cacheKey);
+            if (expireTask is not null)
+            {
+                await LogExpirationFailureAsync(expireTask, cacheKey);
+            }
+        }
     }
 
+    /// <summary>
+    /// Gets map entries for the specified cache key.
+    /// </summary>
+    /// <param name="key">The cache key.</param>
+    /// <param name="mapKeys">The map keys to retrieve.</param>
+    /// <returns>The values associated with the supplied map keys.</returns>
     public async Task<TMapValue[]> GetMapEntriesAsync(TKey key, TMapKey[] mapKeys)
     {
         ValidateKey(key);
 
-        if (mapKeys == null || mapKeys.Length == 0)
+        if (mapKeys is null || mapKeys.Length == 0)
         {
             return Array.Empty<TMapValue>();
         }
 
-        var redisHashKeys = mapKeys
-            .Select(mapKey =>
-            {
-                if (!TryParse(mapKey, out RedisValue redisHashKey))
-                {
-                    throw new ArgumentException($"Unable to convert '{nameof(mapKey)}' of type '{typeof(TMapKey).Name}' to a '{nameof(RedisValue)}'.");
-                }
+        var redisHashKeys = new RedisValue[mapKeys.Length];
 
-                return redisHashKey;
-            });
+        for (int i = 0; i < mapKeys.Length; i++)
+        {
+            redisHashKeys[i] = ConvertMapKeyToRedisValue(mapKeys[i]);
+        }
 
         string cacheKey = GetCacheKey(key);
 
-        var keys = redisHashKeys.ToArray();
-        var hashValues = await _cache.HashGetAsync(cacheKey, keys);
+        var batch = _cache.CreateBatch();
+        var hashValuesTask = batch.HashGetAsync(cacheKey, redisHashKeys);
+        Task<bool> expireTask = null;
 
-        // Handle sliding expiration refresh of the cache entry
-        ApplySlidingExpiration(cacheKey);
+        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+        {
+            expireTask = batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
+        }
 
-        return hashValues.Select(ConvertRedisValue).ToArray();
+        batch.Execute();
+
+        var hashValues = await hashValuesTask;
+
+        if (expireTask is not null)
+        {
+            await LogExpirationFailureAsync(expireTask, cacheKey);
+        }
+
+        var mapValues = new TMapValue[hashValues.Length];
+
+        for (int i = 0; i < hashValues.Length; i++)
+        {
+            mapValues[i] = ConvertRedisValue(hashValues[i]);
+        }
+
+        return mapValues;
     }
 
+    /// <summary>
+    /// Deletes a map entry for the specified cache key.
+    /// </summary>
+    /// <param name="key">The cache key.</param>
+    /// <param name="mapKey">The map key to delete.</param>
+    /// <returns><see langword="true"/> if the map entry was deleted; otherwise, <see langword="false"/>.</returns>
     public async Task<bool> DeleteMapEntryAsync(TKey key, TMapKey mapKey)
     {
         ValidateKey(key);
         ValidateMapKey(mapKey);
 
-        if (!TryParse(mapKey, out RedisValue redisHashKey))
-        {
-            throw new ArgumentException($"Unable to convert '{nameof(mapKey)}' of type '{typeof(TMapKey).Name}' to a '{nameof(RedisValue)}'.");
-        }
+        RedisValue redisHashKey = ConvertMapKeyToRedisValue(mapKey);
 
         string cacheKey = GetCacheKey(key);
-        var deleteResult = await _cache.HashDeleteAsync(cacheKey, redisHashKey);
+        var batch = _cache.CreateBatch();
+        var deleteResultTask = batch.HashDeleteAsync(cacheKey, redisHashKey);
+        Task<bool> expireTask = null;
 
-        // Handle sliding expiration refresh of the cache entry
-        ApplySlidingExpiration(cacheKey);
+        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+        {
+            expireTask = batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
+        }
+
+        batch.Execute();
+
+        var deleteResult = await deleteResultTask;
+
+        if (expireTask is not null)
+        {
+            await LogExpirationFailureAsync(expireTask, cacheKey);
+        }
 
         return deleteResult;
     }
 
-    private void ApplyInitialExpiration(string cacheKey)
+    private Task<bool> ApplyInitialExpirationBatched(IBatch batch, string cacheKey)
     {
         if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
         {
-            // Set the initial expiration using the sliding expiration period
-            long slidingExpirationMs = (long) _slidingExpirationPeriod.Value.TotalMilliseconds;
-
-            // Set initial sliding expiration for the key
-            _cache.ExecuteAsync(
-                $"PEXPIRE",
-                new object[]
-                {
-                    cacheKey,
-                    slidingExpirationMs
-                },
-                CommandFlags.FireAndForget);
+            return batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
         }
-        else if (_absoluteExpirationPeriod is { TotalMilliseconds: > 0 })
+
+        if (_absoluteExpirationPeriod is { TotalMilliseconds: > 0 })
         {
-            // Set the initial expiration using the absolute expiration period
-            long absoluteExpirationMs = (long) _absoluteExpirationPeriod.Value.TotalMilliseconds;
-
-            // Set initial absolute expiration for the key (but only if expiration hasn't been set yet)
-            _cache.Execute(
-                $"PEXPIRE",
-                new object[]
-                {
-                    cacheKey,
-                    absoluteExpirationMs,
-                    "NX"
-                },
-                CommandFlags.FireAndForget);
+            return batch.KeyExpireAsync(cacheKey, _absoluteExpirationPeriod.Value, ExpireWhen.HasNoExpiry);
         }
+
+        return null;
     }
 
-    private void ApplySlidingExpiration(string cacheKey)
+    private async Task LogExpirationFailureAsync(Task<bool> expireTask, string cacheKey)
     {
-        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+        try
         {
-            // Slide the expiration
-            _cache.Execute(
-                $"PEXPIRE",
-                new object[]
-                {
-                    cacheKey,
-                    (long) _slidingExpirationPeriod.Value.TotalMilliseconds
-                },
-                CommandFlags.FireAndForget);
+            var result = await expireTask;
+
+            if (!result && _logger.IsDebugEnabled)
+            {
+                _logger.Debug($"PEXPIRE returned false for key '{cacheKey}' — key may not exist.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Failed to set expiration for cache key '{cacheKey}'.", ex);
         }
     }
 
@@ -196,6 +222,26 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
     protected virtual TMapValue ConvertRedisValue(RedisValue hashValue)
     {
         return (TMapValue) Convert.ChangeType(hashValue, typeof(TMapValue));
+    }
+
+    protected virtual RedisValue ConvertMapKeyToRedisValue(TMapKey mapKey)
+    {
+        if (!TryParse(mapKey, out RedisValue value))
+        {
+            throw new ArgumentException($"Unable to convert map key of type '{typeof(TMapKey).Name}' to a '{nameof(RedisValue)}'.");
+        }
+
+        return value;
+    }
+
+    protected virtual RedisValue ConvertMapValueToRedisValue(TMapValue mapValue)
+    {
+        if (!TryParse(mapValue, out RedisValue value))
+        {
+            throw new ArgumentException($"Unable to convert map value of type '{typeof(TMapValue).Name}' to a '{nameof(RedisValue)}'.");
+        }
+
+        return value;
     }
 
     private static bool TryParse<T>(T obj, out RedisValue value)

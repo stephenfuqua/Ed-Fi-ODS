@@ -14,6 +14,10 @@ public class RedisUniqueIdByUsiMapCache : RedisPersonIdentifierMapCache<int, str
     public RedisUniqueIdByUsiMapCache(IRedisConnectionProvider redisConnectionProvider, TimeSpan? absoluteExpirationPeriod, TimeSpan? slidingExpirationPeriod)
         : base(redisConnectionProvider, absoluteExpirationPeriod, slidingExpirationPeriod) { }
 
+    protected override RedisValue ConvertMapKeyToRedisValue(int mapKey) => mapKey;
+
+    protected override RedisValue ConvertMapValueToRedisValue(string mapValue) => mapValue;
+
     protected override string ConvertRedisValue(RedisValue hashValue) => hashValue;
 
     protected override void ValidateMapKey(int mapKey)

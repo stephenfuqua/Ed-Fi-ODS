@@ -5,34 +5,71 @@
 
 using System;
 using System.Threading;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
+using EdFi.Ods.Common.Configuration;
 using StackExchange.Redis;
 
 namespace EdFi.Ods.Features.Services.Redis;
 
+/// <summary>
+/// Provides access to a Redis database connection.
+/// </summary>
 public class RedisConnectionProvider : IRedisConnectionProvider
 {
-    private readonly RedisCacheOptions _options;
+    private readonly ConfigurationOptions _configurationOptions;
     private readonly SemaphoreSlim _connectionLock = new(initialCount: 1, maxCount: 1);
 
     private volatile IConnectionMultiplexer _connection;
     private IDatabase _cache;
 
-    public RedisConnectionProvider(string configuration)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisConnectionProvider"/> class.
+    /// </summary>
+    /// <param name="redisConfiguration">The Redis connection settings.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="redisConfiguration"/> is null.</exception>
+    public RedisConnectionProvider(RedisConfiguration redisConfiguration)
     {
-        _options = new RedisCacheOptions() { Configuration = configuration };
+        if (redisConfiguration is null)
+        {
+            throw new ArgumentNullException(nameof(redisConfiguration));
+        }
+
+        _configurationOptions = CreateConfigurationOptions(redisConfiguration);
     }
-    
+
     public IDatabase Get()
     {
         EnsureConnected();
 
         return _cache;
     }
-    
+
+    internal static ConfigurationOptions CreateConfigurationOptions(RedisConfiguration redisConfiguration)
+    {
+        if (redisConfiguration is null)
+        {
+            throw new ArgumentNullException(nameof(redisConfiguration));
+        }
+
+        var configurationOptions = ConfigurationOptions.Parse(redisConfiguration.Configuration ?? "localhost");
+        configurationOptions.SyncTimeout = redisConfiguration.SyncTimeoutMs;
+        configurationOptions.AsyncTimeout = redisConfiguration.AsyncTimeoutMs;
+        configurationOptions.ConnectTimeout = redisConfiguration.ConnectTimeoutMs;
+        configurationOptions.ConnectRetry = redisConfiguration.ConnectRetry;
+        configurationOptions.AbortOnConnectFail = redisConfiguration.AbortOnConnectFail;
+        configurationOptions.KeepAlive = redisConfiguration.KeepAliveSeconds;
+        configurationOptions.Ssl = redisConfiguration.Ssl;
+
+        if (!string.IsNullOrWhiteSpace(redisConfiguration.Password))
+        {
+            configurationOptions.Password = redisConfiguration.Password;
+        }
+
+        return configurationOptions;
+    }
+
     private void EnsureConnected()
     {
-        if (_cache != null)
+        if (_cache is not null)
         {
             return;
         }
@@ -41,48 +78,15 @@ public class RedisConnectionProvider : IRedisConnectionProvider
 
         try
         {
-            if (_cache == null)
+            if (_cache is null)
             {
-                if(_options.ConnectionMultiplexerFactory is null)
-                {
-                    if (_options.ConfigurationOptions is not null)
-                    {
-                        _connection = ConnectionMultiplexer.Connect(_options.ConfigurationOptions);
-                    }
-                    else if (!string.IsNullOrWhiteSpace(_options.Configuration))
-                    {
-                        _connection = ConnectionMultiplexer.Connect(_options.Configuration);
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("External cache is enabled and configured for Redis, but neither a configuration string nor Redis configuration options have been provided in appsettings");
-                    }
-                }
-                else
-                {
-                    _connection = _options.ConnectionMultiplexerFactory().ConfigureAwait(false).GetAwaiter().GetResult();;
-                }
-
-                TryRegisterProfiler();
+                _connection = ConnectionMultiplexer.Connect(_configurationOptions);
                 _cache = _connection.GetDatabase();
             }
         }
         finally
         {
             _connectionLock.Release();
-        }
-    }
-
-    private void TryRegisterProfiler()
-    {
-        if (_connection == null)
-        {
-            throw new InvalidOperationException($"{nameof(_connection)} cannot be null.");
-        }
-
-        if (_options.ProfilingSession != null)
-        {
-            _connection.RegisterProfiler(_options.ProfilingSession);
         }
     }
 }
