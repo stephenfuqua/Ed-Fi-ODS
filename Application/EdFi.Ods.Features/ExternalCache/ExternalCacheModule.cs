@@ -17,6 +17,7 @@ using EdFi.Ods.Common.Container;
 using EdFi.Ods.Features.ExternalCache.Redis;
 using EdFi.Ods.Features.Services.Redis;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.FeatureManagement;
 
 namespace EdFi.Ods.Features.ExternalCache
@@ -104,19 +105,25 @@ namespace EdFi.Ods.Features.ExternalCache
 
         public void OverrideDescriptorsCache(ContainerBuilder builder)
         {
-            // Override the named interceptor registration to use the external (distributed) cache
-            builder.RegisterType<ContextualCachingInterceptor<OdsInstanceConfiguration>>()
-                .Named<IInterceptor>(InterceptorCacheKeys.Descriptors)
-                .WithParameter(
+            builder.Register(
                     ctx =>
                     {
                         int absoluteExpirationSeconds = _cacheSettings.Descriptors.AbsoluteExpirationSeconds;
+                        int l1CacheDurationSeconds = _cacheSettings.Descriptors.L1CacheDurationSeconds;
 
-                        return (ICacheProvider<ulong>)new ExternalCacheProvider<ulong>(
+                        return new TieredCacheProvider(
+                            ctx.Resolve<IMemoryCache>(),
                             ctx.Resolve<IDistributedCache>(),
+                            TimeSpan.FromSeconds(l1CacheDurationSeconds),
                             TimeSpan.Zero,
                             TimeSpan.FromSeconds(absoluteExpirationSeconds));
                     })
+                .As<ICacheProvider<ulong>>()
+                .As<IAsyncCacheProvider<ulong>>()
+                .SingleInstance();
+
+            builder.RegisterType<AsyncContextualCachingInterceptor<OdsInstanceConfiguration>>()
+                .Named<IInterceptor>(InterceptorCacheKeys.Descriptors)
                 .SingleInstance();
         }
 

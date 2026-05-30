@@ -29,6 +29,7 @@ namespace EdFi.Ods.Common.Configuration
         {
             public bool UseExternalCache { get; set; }
             public int AbsoluteExpirationSeconds { get; set; } = 1800;
+            public int L1CacheDurationSeconds { get; set; } = 10;
         }
 
         public class PersonUniqueIdToUsiCacheConfiguration
