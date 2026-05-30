@@ -134,9 +134,14 @@ namespace EdFi.Ods.Features.ExternalCache
                 builder.Register(
                         c => new RedisConnectionProvider(c.Resolve<ApiSettings>().Services.Redis))
                     .As<IRedisConnectionProvider>()
+                    .IfNotRegistered(typeof(IRedisConnectionProvider))
                     .SingleInstance();
 
                 builder.RegisterType<RedisUsiByUniqueIdMapCache>()
+                    .WithParameter(
+                        new ResolvedParameter(
+                            (p, c) => p.ParameterType == typeof(RedisCacheResilience),
+                            (_, c) => c.Resolve<RedisCacheResilience>()))
                     .WithParameter(
                         new ResolvedParameter(
                             (p, c) => p.Name.EqualsIgnoreCase("slidingExpirationPeriod"),
@@ -159,6 +164,10 @@ namespace EdFi.Ods.Features.ExternalCache
                     .SingleInstance();
 
                 builder.RegisterType<RedisUniqueIdByUsiMapCache>()
+                    .WithParameter(
+                        new ResolvedParameter(
+                            (p, c) => p.ParameterType == typeof(RedisCacheResilience),
+                            (_, c) => c.Resolve<RedisCacheResilience>()))
                     .WithParameter(
                         new ResolvedParameter(
                             (p, c) => p.Name.EqualsIgnoreCase("slidingExpirationPeriod"),

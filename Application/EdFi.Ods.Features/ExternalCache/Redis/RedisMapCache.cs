@@ -4,10 +4,12 @@
 // See the LICENSE and NOTICES files in the project root for more information.
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using EdFi.Ods.Api.Caching;
 using EdFi.Ods.Features.Services.Redis;
 using log4net;
+using Polly.CircuitBreaker;
 using StackExchange.Redis;
 
 namespace EdFi.Ods.Features.ExternalCache.Redis;
@@ -23,19 +25,20 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
 {
     private readonly TimeSpan? _absoluteExpirationPeriod;
     private readonly TimeSpan? _slidingExpirationPeriod;
-
-    private readonly IDatabase _cache;
+    private readonly IRedisConnectionProvider _redisConnectionProvider;
+    private readonly RedisCacheResilience _resilience;
     private readonly ILog _logger = LogManager.GetLogger(typeof(RedisMapCache<,,>).Name);
 
     protected RedisMapCache(
         IRedisConnectionProvider redisConnectionProvider,
+        RedisCacheResilience resilience,
         TimeSpan? absoluteExpirationPeriod,
         TimeSpan? slidingExpirationPeriod)
     {
+        _redisConnectionProvider = redisConnectionProvider ?? throw new ArgumentNullException(nameof(redisConnectionProvider));
+        _resilience = resilience ?? throw new ArgumentNullException(nameof(resilience));
         _absoluteExpirationPeriod = absoluteExpirationPeriod;
         _slidingExpirationPeriod = slidingExpirationPeriod;
-
-        _cache = redisConnectionProvider.Get();
     }
 
     /// <summary>
@@ -45,7 +48,6 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
     /// <param name="mapEntries">The map entries to store.</param>
     public async Task SetMapEntriesAsync(TKey key, (TMapKey key, TMapValue value)[] mapEntries)
     {
-        // Maximum number of items per batch
         const int BatchSize = 524000;
 
         ValidateKey(key);
@@ -66,24 +68,42 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
 
         string cacheKey = GetCacheKey(key);
 
-        // Break the hash entries into batches and send each batch separately to avoid the ~1M parameter limit for Redis commands
-        for (int i = 0; i < hashEntries.Length; i += BatchSize)
+        try
         {
-            int remaining = hashEntries.Length - i;
-            int currentBatchSize = Math.Min(BatchSize, remaining);
-            var batchEntries = new HashEntry[currentBatchSize];
-            Array.Copy(hashEntries, i, batchEntries, 0, currentBatchSize);
-            bool isLastBatch = i + currentBatchSize >= hashEntries.Length;
-            var batch = _cache.CreateBatch();
-            var setTask = batch.HashSetAsync(cacheKey, batchEntries);
-            Task<bool> expireTask = isLastBatch ? ApplyInitialExpirationBatched(batch, cacheKey) : null;
-            batch.Execute();
-            await setTask;
+            await _resilience.Pipeline.ExecuteAsync(
+                    async _ =>
+                    {
+                        var cache = _redisConnectionProvider.Get();
 
-            if (expireTask is not null)
-            {
-                await LogExpirationFailureAsync(expireTask, cacheKey);
-            }
+                        for (int i = 0; i < hashEntries.Length; i += BatchSize)
+                        {
+                            int remaining = hashEntries.Length - i;
+                            int currentBatchSize = Math.Min(BatchSize, remaining);
+                            var batchEntries = new HashEntry[currentBatchSize];
+                            Array.Copy(hashEntries, i, batchEntries, 0, currentBatchSize);
+                            bool isLastBatch = i + currentBatchSize >= hashEntries.Length;
+                            var batch = cache.CreateBatch();
+                            var setTask = batch.HashSetAsync(cacheKey, batchEntries);
+                            Task<bool> expireTask = isLastBatch ? ApplyInitialExpirationBatched(batch, cacheKey) : null;
+                            batch.Execute();
+                            await setTask.ConfigureAwait(false);
+
+                            if (expireTask is not null)
+                            {
+                                await LogExpirationFailureAsync(expireTask, cacheKey).ConfigureAwait(false);
+                            }
+                        }
+                    },
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            LogOpenCircuit(nameof(SetMapEntriesAsync), cacheKey, ex);
+        }
+        catch (Exception ex) when (IsRedisUnavailable(ex))
+        {
+            _logger.Warn($"Redis cache set failed for key '{cacheKey}'. Falling back to uncached behavior.", ex);
         }
     }
 
@@ -111,32 +131,54 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
 
         string cacheKey = GetCacheKey(key);
 
-        var batch = _cache.CreateBatch();
-        var hashValuesTask = batch.HashGetAsync(cacheKey, redisHashKeys);
-        Task<bool> expireTask = null;
-
-        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+        try
         {
-            expireTask = batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
+            TMapValue[] mapValues = null;
+
+            await _resilience.Pipeline.ExecuteAsync(
+                    async _ =>
+                    {
+                        var cache = _redisConnectionProvider.Get();
+                        var batch = cache.CreateBatch();
+                        var hashValuesTask = batch.HashGetAsync(cacheKey, redisHashKeys);
+                        Task<bool> expireTask = null;
+
+                        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+                        {
+                            expireTask = batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
+                        }
+
+                        batch.Execute();
+
+                        var hashValues = await hashValuesTask.ConfigureAwait(false);
+
+                        if (expireTask is not null)
+                        {
+                            await LogExpirationFailureAsync(expireTask, cacheKey).ConfigureAwait(false);
+                        }
+
+                        mapValues = new TMapValue[hashValues.Length];
+
+                        for (int i = 0; i < hashValues.Length; i++)
+                        {
+                            mapValues[i] = ConvertRedisValue(hashValues[i]);
+                        }
+                    },
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+
+            return mapValues ?? new TMapValue[mapKeys.Length];
         }
-
-        batch.Execute();
-
-        var hashValues = await hashValuesTask;
-
-        if (expireTask is not null)
+        catch (BrokenCircuitException ex)
         {
-            await LogExpirationFailureAsync(expireTask, cacheKey);
+            LogOpenCircuit(nameof(GetMapEntriesAsync), cacheKey, ex);
+            return new TMapValue[mapKeys.Length];
         }
-
-        var mapValues = new TMapValue[hashValues.Length];
-
-        for (int i = 0; i < hashValues.Length; i++)
+        catch (Exception ex) when (IsRedisUnavailable(ex))
         {
-            mapValues[i] = ConvertRedisValue(hashValues[i]);
+            _logger.Warn($"Redis cache get failed for key '{cacheKey}'. Falling back to uncached behavior.", ex);
+            return new TMapValue[mapKeys.Length];
         }
-
-        return mapValues;
     }
 
     /// <summary>
@@ -153,25 +195,48 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
         RedisValue redisHashKey = ConvertMapKeyToRedisValue(mapKey);
 
         string cacheKey = GetCacheKey(key);
-        var batch = _cache.CreateBatch();
-        var deleteResultTask = batch.HashDeleteAsync(cacheKey, redisHashKey);
-        Task<bool> expireTask = null;
 
-        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+        try
         {
-            expireTask = batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
+            bool deleteResult = false;
+
+            await _resilience.Pipeline.ExecuteAsync(
+                    async _ =>
+                    {
+                        var cache = _redisConnectionProvider.Get();
+                        var batch = cache.CreateBatch();
+                        var deleteResultTask = batch.HashDeleteAsync(cacheKey, redisHashKey);
+                        Task<bool> expireTask = null;
+
+                        if (_slidingExpirationPeriod is { TotalMilliseconds: > 0 })
+                        {
+                            expireTask = batch.KeyExpireAsync(cacheKey, _slidingExpirationPeriod.Value);
+                        }
+
+                        batch.Execute();
+
+                        deleteResult = await deleteResultTask.ConfigureAwait(false);
+
+                        if (expireTask is not null)
+                        {
+                            await LogExpirationFailureAsync(expireTask, cacheKey).ConfigureAwait(false);
+                        }
+                    },
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+
+            return deleteResult;
         }
-
-        batch.Execute();
-
-        var deleteResult = await deleteResultTask;
-
-        if (expireTask is not null)
+        catch (BrokenCircuitException ex)
         {
-            await LogExpirationFailureAsync(expireTask, cacheKey);
+            LogOpenCircuit(nameof(DeleteMapEntryAsync), cacheKey, ex);
+            return false;
         }
-
-        return deleteResult;
+        catch (Exception ex) when (IsRedisUnavailable(ex))
+        {
+            _logger.Warn($"Redis cache delete failed for key '{cacheKey}'. Falling back to uncached behavior.", ex);
+            return false;
+        }
     }
 
     private Task<bool> ApplyInitialExpirationBatched(IBatch batch, string cacheKey)
@@ -193,7 +258,7 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
     {
         try
         {
-            var result = await expireTask;
+            var result = await expireTask.ConfigureAwait(false);
 
             if (!result && _logger.IsDebugEnabled)
             {
@@ -204,6 +269,19 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
         {
             _logger.Warn($"Failed to set expiration for cache key '{cacheKey}'.", ex);
         }
+    }
+
+    private void LogOpenCircuit(string operationName, string cacheKey, BrokenCircuitException ex)
+    {
+        if (_logger.IsDebugEnabled)
+        {
+            _logger.Debug($"Skipping Redis cache operation '{operationName}' for key '{cacheKey}' because the circuit is open.", ex);
+        }
+    }
+
+    private static bool IsRedisUnavailable(Exception ex)
+    {
+        return ex is RedisException or TimeoutException;
     }
 
     // Utility functions that can be overridden in derived implementations to optimize behavior (such as avoid boxing/unboxing of arguments).
@@ -246,7 +324,6 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
 
     private static bool TryParse<T>(T obj, out RedisValue value)
     {
-        // Generic version of similar function defined internally in RedisValue
         value = obj switch
         {
             string v => v,
@@ -264,6 +341,6 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
             _ => RedisValue.Null,
         };
 
-        return (value != RedisValue.Null);
+        return value != RedisValue.Null;
     }
 }

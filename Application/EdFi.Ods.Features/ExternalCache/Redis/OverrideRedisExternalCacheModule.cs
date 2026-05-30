@@ -6,6 +6,7 @@
 using Autofac;
 using EdFi.Ods.Common.Configuration;
 using EdFi.Ods.Features.ExternalCache;
+using EdFi.Ods.Features.ExternalCache.Redis;
 using EdFi.Ods.Features.Services.Redis;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
@@ -34,6 +35,11 @@ public class OverrideRedisExternalCacheModule : ExternalCacheModule
 
         var redisConfiguration = _servicesSettings.Redis;
         var configurationOptions = RedisConnectionProvider.CreateConfigurationOptions(redisConfiguration);
+
+        builder.RegisterType<RedisCacheResilience>()
+            .AsSelf()
+            .IfNotRegistered(typeof(RedisCacheResilience))
+            .SingleInstance();
 
         // Ensure the Redis connection provider is registered (it may be registered by other conditional modules as well)
         builder.Register(_ => new RedisConnectionProvider(redisConfiguration))

@@ -6,6 +6,7 @@
 using System;
 using System.Threading;
 using EdFi.Ods.Common.Configuration;
+using log4net;
 using StackExchange.Redis;
 
 namespace EdFi.Ods.Features.Services.Redis;
@@ -17,6 +18,7 @@ public class RedisConnectionProvider : IRedisConnectionProvider
 {
     private readonly ConfigurationOptions _configurationOptions;
     private readonly SemaphoreSlim _connectionLock = new(initialCount: 1, maxCount: 1);
+    private readonly ILog _logger = LogManager.GetLogger(typeof(RedisConnectionProvider));
 
     private volatile IConnectionMultiplexer _connection;
     private IDatabase _cache;
@@ -36,6 +38,10 @@ public class RedisConnectionProvider : IRedisConnectionProvider
         _configurationOptions = CreateConfigurationOptions(redisConfiguration);
     }
 
+    /// <inheritdoc />
+    public bool IsConnected { get; private set; }
+
+    /// <inheritdoc />
     public IDatabase Get()
     {
         EnsureConnected();
@@ -81,12 +87,49 @@ public class RedisConnectionProvider : IRedisConnectionProvider
             if (_cache is null)
             {
                 _connection = ConnectionMultiplexer.Connect(_configurationOptions);
+                SubscribeToConnectionEvents(_connection);
                 _cache = _connection.GetDatabase();
+                IsConnected = _connection.IsConnected;
             }
         }
         finally
         {
             _connectionLock.Release();
         }
+    }
+
+    private void SubscribeToConnectionEvents(IConnectionMultiplexer connection)
+    {
+        connection.ConnectionFailed += OnConnectionFailed;
+        connection.ConnectionRestored += OnConnectionRestored;
+        connection.ErrorMessage += OnErrorMessage;
+        connection.InternalError += OnInternalError;
+    }
+
+    private void OnConnectionFailed(object sender, ConnectionFailedEventArgs args)
+    {
+        IsConnected = false;
+
+        _logger.Error(
+            $"Redis connection failed. Endpoint: {args.EndPoint}, FailureType: {args.FailureType}, ConnectionType: {args.ConnectionType}.",
+            args.Exception);
+    }
+
+    private void OnConnectionRestored(object sender, ConnectionFailedEventArgs args)
+    {
+        IsConnected = true;
+
+        _logger.Info(
+            $"Redis connection restored. Endpoint: {args.EndPoint}, FailureType: {args.FailureType}, ConnectionType: {args.ConnectionType}.");
+    }
+
+    private void OnErrorMessage(object sender, RedisErrorEventArgs args)
+    {
+        _logger.Warn($"Redis reported an error message: {args.Message}");
+    }
+
+    private void OnInternalError(object sender, InternalErrorEventArgs args)
+    {
+        _logger.Warn($"Redis reported an internal error from '{args.Origin}'.", args.Exception);
     }
 }
