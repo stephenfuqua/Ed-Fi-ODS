@@ -339,6 +339,11 @@ namespace EdFi.Ods.Api.Container.Modules
             builder.RegisterType<UniqueIdCacheInitializationMarkerKeyProvider>()
                 .As<ICacheInitializationMarkerKeyProvider<string>>()
                 .SingleInstance();
+
+            builder.RegisterType<InMemoryDistributedLockProvider>()
+                .As<IDistributedLockProvider>()
+                .SingleInstance()
+                .PreserveExistingDefaults();
             
             builder.RegisterType<PersonUniqueIdResolver>()
                 .WithParameter(

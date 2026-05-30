@@ -9,6 +9,7 @@ using EdFi.Ods.Api.IdentityValueMappers;
 using EdFi.Ods.Common.Configuration;
 using EdFi.Ods.Common.Context;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using EdFi.Ods.Api.Caching.Person;
 using FakeItEasy;
@@ -25,6 +26,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
         private IMapCache<(ulong, string, PersonMapType), string, int> _fakeReverseMapCache;
         private Dictionary<string, bool> _fakeCacheSuppressionByPersonType;
         private IPersonMapCacheInitializer _fakePersonMapCacheInitializer;
+        private IDistributedLockProvider _fakeDistributedLockProvider;
         private IContextProvider<OdsInstanceConfiguration> _fakeOdsInstanceConfigurationContextProvider;
 
         [SetUp]
@@ -35,6 +37,10 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
             _fakeReverseMapCache = A.Fake<IMapCache<(ulong, string, PersonMapType), string, int>>();
             _fakeCacheSuppressionByPersonType = new Dictionary<string, bool>();
             _fakePersonMapCacheInitializer = A.Fake<IPersonMapCacheInitializer>();
+            _fakeDistributedLockProvider = A.Fake<IDistributedLockProvider>();
+
+            A.CallTo(() => _fakeDistributedLockProvider.TryAcquireLockAsync(A<string>.Ignored, A<TimeSpan>.Ignored))
+                .Returns(true);
 
             var odsInstanceConfiguration = new OdsInstanceConfiguration(
                 1,
@@ -75,6 +81,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
 
             var resolver = new PersonUniqueIdResolver(
                 _fakePersonMapCacheInitializer,
+                _fakeDistributedLockProvider,
                 _fakePersonIdentifiersProvider,
                 _fakeOdsInstanceConfigurationContextProvider,
                 _fakeMapCache,
@@ -165,6 +172,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
             
             var resolver = new PersonUniqueIdResolver(
                 _fakePersonMapCacheInitializer,
+                _fakeDistributedLockProvider,
                 _fakePersonIdentifiersProvider,
                 _fakeOdsInstanceConfigurationContextProvider,
                 _fakeMapCache,
@@ -236,7 +244,12 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
             }
 
             // Background initialization should have been initiated
-            var backgroundCacheInitializationCall = A.CallTo(() => _fakePersonMapCacheInitializer.InitializePersonMapAsync(123456UL, personType));
+            string lockKey = $"cache-init-lock:123456:{personType}:{PersonMapType.UniqueIdByUsi}";
+            var backgroundCacheInitializationCall = A.CallTo(() => _fakePersonMapCacheInitializer.InitializePersonMapAsync(
+                123456UL,
+                personType,
+                lockKey,
+                CancellationToken.None));
 
             if (useProgressiveLoading)
             {
@@ -272,8 +285,13 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
                     && x[2] == CacheInitializationConstants.InitializationMarkerKeyForUsi)))
                 .Returns(new string[3]);
 
+            string lockKey = $"cache-init-lock:123456:{personType}:{PersonMapType.UniqueIdByUsi}";
+
             A.CallTo(() => _fakePersonMapCacheInitializer.InitializePersonMapAsync(
-                123456UL, personType))
+                123456UL,
+                personType,
+                lockKey,
+                CancellationToken.None))
                 .Returns(Task.FromException(new Exception("Cache initialization failed")));
 
             A.CallTo(() => _fakePersonIdentifiersProvider.GetPersonUniqueIdsAsync(
@@ -287,6 +305,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
 
             var resolver = new PersonUniqueIdResolver(
                 _fakePersonMapCacheInitializer,
+                _fakeDistributedLockProvider,
                 _fakePersonIdentifiersProvider,
                 _fakeOdsInstanceConfigurationContextProvider,
                 _fakeMapCache,
@@ -337,6 +356,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
 
             var resolver = new PersonUniqueIdResolver(
                 _fakePersonMapCacheInitializer,
+                _fakeDistributedLockProvider,
                 _fakePersonIdentifiersProvider,
                 _fakeOdsInstanceConfigurationContextProvider,
                 _fakeMapCache,
@@ -358,7 +378,11 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
                 .MustHaveHappenedOnceExactly();
 
             // There should be no attempt to initialize the cache
-            A.CallTo(() => _fakePersonMapCacheInitializer.InitializePersonMapAsync(A<ulong>.Ignored, A<string>.Ignored))
+            A.CallTo(() => _fakePersonMapCacheInitializer.InitializePersonMapAsync(
+                    A<ulong>.Ignored,
+                    A<string>.Ignored,
+                    A<string>.Ignored,
+                    A<CancellationToken>.Ignored))
                 .MustNotHaveHappened();
         }
 
@@ -378,6 +402,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
 
             var resolver = new PersonUniqueIdResolver(
                 _fakePersonMapCacheInitializer,
+                _fakeDistributedLockProvider,
                 _fakePersonIdentifiersProvider,
                 _fakeOdsInstanceConfigurationContextProvider,
                 _fakeMapCache,
@@ -423,3 +448,7 @@ namespace EdFi.Ods.Tests.EdFi.Ods.Api.Caching
         }
     }
 }
+
+
+
+

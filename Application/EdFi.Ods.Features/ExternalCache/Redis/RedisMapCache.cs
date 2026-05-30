@@ -48,7 +48,7 @@ public class RedisMapCache<TKey, TMapKey, TMapValue> : IMapCache<TKey, TMapKey, 
     /// <param name="mapEntries">The map entries to store.</param>
     public async Task SetMapEntriesAsync(TKey key, (TMapKey key, TMapValue value)[] mapEntries)
     {
-        const int BatchSize = 524000;
+        const int BatchSize = 5000;
 
         ValidateKey(key);
 
