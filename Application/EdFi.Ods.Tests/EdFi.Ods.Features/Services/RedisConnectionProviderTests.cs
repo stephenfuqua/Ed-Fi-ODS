@@ -37,6 +37,17 @@ public class RedisConnectionProviderTests
     }
 
     [Test]
+    public void Constructor_WithConnectionString_InitializesSuccessfully()
+    {
+        // Act
+        var provider = new RedisConnectionProvider("localhost:6379");
+
+        // Assert
+        provider.ShouldNotBeNull();
+        provider.IsConnected.ShouldBeFalse();
+    }
+
+    [Test]
     public void Constructor_WithAllConfigurationSettings_AppliesAllSettingsCorrectly()
     {
         // Arrange

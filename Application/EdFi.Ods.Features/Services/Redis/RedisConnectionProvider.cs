@@ -5,6 +5,7 @@
 
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using EdFi.Ods.Common.Configuration;
 using log4net;
 using StackExchange.Redis;
@@ -33,6 +34,16 @@ public class RedisConnectionProvider : IRedisConnectionProvider
         ArgumentNullException.ThrowIfNull(redisConfiguration);
 
         _configurationOptions = CreateConfigurationOptions(redisConfiguration);
+        _ = WarmupConnectionAsync();
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisConnectionProvider"/> class.
+    /// </summary>
+    /// <param name="configuration">The Redis connection string.</param>
+    public RedisConnectionProvider(string configuration)
+        : this(new RedisConfiguration { Configuration = configuration })
+    {
     }
 
     /// <inheritdoc />
@@ -41,7 +52,7 @@ public class RedisConnectionProvider : IRedisConnectionProvider
     /// <inheritdoc />
     public IDatabase Get()
     {
-        EnsureConnected();
+        EnsureConnectedAsync().GetAwaiter().GetResult();
 
         return _cache;
     }
@@ -72,20 +83,20 @@ public class RedisConnectionProvider : IRedisConnectionProvider
         return configurationOptions;
     }
 
-    private void EnsureConnected()
+    private async Task EnsureConnectedAsync()
     {
         if (_cache is not null)
         {
             return;
         }
 
-        _connectionLock.Wait();
+        await _connectionLock.WaitAsync().ConfigureAwait(false);
 
         try
         {
             if (_cache is null)
             {
-                _connection = ConnectionMultiplexer.Connect(_configurationOptions);
+                _connection = await ConnectionMultiplexer.ConnectAsync(_configurationOptions).ConfigureAwait(false);
                 SubscribeToConnectionEvents(_connection);
                 _cache = _connection.GetDatabase();
                 IsConnected = _connection.IsConnected;
@@ -94,6 +105,18 @@ public class RedisConnectionProvider : IRedisConnectionProvider
         finally
         {
             _connectionLock.Release();
+        }
+    }
+
+    private async Task WarmupConnectionAsync()
+    {
+        try
+        {
+            await EnsureConnectedAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn("Unable to pre-establish Redis connection. A subsequent cache operation will retry.", ex);
         }
     }
 

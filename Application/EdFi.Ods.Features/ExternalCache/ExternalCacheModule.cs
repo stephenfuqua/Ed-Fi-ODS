@@ -166,24 +166,8 @@ public abstract class ExternalCacheModule : ConditionalModule, IExternalCacheMod
                     new ResolvedParameter(
                         (p, c) => p.ParameterType == typeof(RedisCacheResilience),
                         (_, c) => c.Resolve<RedisCacheResilience>()))
-                .WithParameter(
-                    new ResolvedParameter(
-                        (p, c) => p.Name.EqualsIgnoreCase("slidingExpirationPeriod"),
-                        (p, c) =>
-                        {
-                            var apiSettings = c.Resolve<ApiSettings>();
-                            int seconds = apiSettings.Caching.PersonUniqueIdToUsi.SlidingExpirationSeconds;
-                            return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
-                        }))
-                .WithParameter(
-                    new ResolvedParameter(
-                        (p, c) => p.Name.EqualsIgnoreCase("absoluteExpirationPeriod"),
-                        (p, c) =>
-                        {
-                            var apiSettings = c.Resolve<ApiSettings>();
-                            int seconds = apiSettings.Caching.PersonUniqueIdToUsi.AbsoluteExpirationSeconds;
-                            return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
-                        }))
+                .WithParameter(CreateExpirationParameter("slidingExpirationPeriod", c => c.Caching.PersonUniqueIdToUsi.SlidingExpirationSeconds))
+                .WithParameter(CreateExpirationParameter("absoluteExpirationPeriod", c => c.Caching.PersonUniqueIdToUsi.AbsoluteExpirationSeconds))
                 .As<IMapCache<(ulong odsInstanceHashId, string personType, PersonMapType mapType), string, int>>()
                 .SingleInstance();
 
@@ -192,26 +176,23 @@ public abstract class ExternalCacheModule : ConditionalModule, IExternalCacheMod
                     new ResolvedParameter(
                         (p, c) => p.ParameterType == typeof(RedisCacheResilience),
                         (_, c) => c.Resolve<RedisCacheResilience>()))
-                .WithParameter(
-                    new ResolvedParameter(
-                        (p, c) => p.Name.EqualsIgnoreCase("slidingExpirationPeriod"),
-                        (p, c) =>
-                        {
-                            var apiSettings = c.Resolve<ApiSettings>();
-                            int seconds = apiSettings.Caching.PersonUniqueIdToUsi.SlidingExpirationSeconds;
-                            return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
-                        }))
-                .WithParameter(
-                    new ResolvedParameter(
-                        (p, c) => p.Name.EqualsIgnoreCase("absoluteExpirationPeriod"),
-                        (p, c) =>
-                        {
-                            var apiSettings = c.Resolve<ApiSettings>();
-                            int seconds = apiSettings.Caching.PersonUniqueIdToUsi.AbsoluteExpirationSeconds;
-                            return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
-                        }))
+                .WithParameter(CreateExpirationParameter("slidingExpirationPeriod", c => c.Caching.PersonUniqueIdToUsi.SlidingExpirationSeconds))
+                .WithParameter(CreateExpirationParameter("absoluteExpirationPeriod", c => c.Caching.PersonUniqueIdToUsi.AbsoluteExpirationSeconds))
                 .As<IMapCache<(ulong odsInstanceHashId, string personType, PersonMapType mapType), int, string>>()
                 .SingleInstance();
         }
+    }
+
+    private static ResolvedParameter CreateExpirationParameter(
+        string parameterName,
+        Func<ApiSettings, int> getSeconds)
+    {
+        return new ResolvedParameter(
+            (p, _) => p.Name.EqualsIgnoreCase(parameterName),
+            (_, c) =>
+            {
+                int seconds = getSeconds(c.Resolve<ApiSettings>());
+                return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
+            });
     }
 }

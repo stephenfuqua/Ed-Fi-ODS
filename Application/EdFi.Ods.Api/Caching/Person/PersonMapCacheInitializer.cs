@@ -37,98 +37,121 @@ public class PersonMapCacheInitializer : IPersonMapCacheInitializer
     }
 
     /// <inheritdoc cref="IPersonMapCacheInitializer.InitializePersonMapAsync" />
-    public Task InitializePersonMapAsync(ulong odsInstanceHashId, string personType, string lockKey, CancellationToken cancellationToken = default)
+    public async Task InitializePersonMapAsync(
+        ulong odsInstanceHashId,
+        string personType,
+        string lockKey,
+        CancellationToken cancellationToken = default)
     {
-        return Task.Run(
-            async () =>
+        Stopwatch stopwatch = null;
+        using var timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellationTokenSource.CancelAfter(InitializationTimeout);
+
+        try
+        {
+            if (_logger.IsDebugEnabled)
             {
-                Stopwatch stopwatch = null;
-                using var timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeoutCancellationTokenSource.CancelAfter(InitializationTimeout);
+                _logger.Debug($"Starting '{personType}' cache initialization for ODS instance '{odsInstanceHashId}'...");
+                stopwatch = Stopwatch.StartNew();
+            }
 
-                try
-                {
-                    if (_logger.IsDebugEnabled)
+            var result = (await _personIdentifiersProvider.GetAllPersonIdentifiersAsync(
+                    personType,
+                    timeoutCancellationTokenSource.Token))
+                .ToArray();
+
+            if (_logger.IsDebugEnabled)
+            {
+                _logger.Debug($"Obtained {result.Length:N0} '{personType}' identifiers after {stopwatch?.ElapsedMilliseconds ?? 0:N0} ms...");
+            }
+
+            timeoutCancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+            var uniqueIdByUsiCacheEntries = result.Select(v => (v.Usi, v.UniqueId))
+                .Concat(
+                    new[]
                     {
-                        _logger.Debug($"Starting '{personType}' cache initialization for ODS instance '{odsInstanceHashId}'...");
-                        stopwatch = Stopwatch.StartNew();
-                    }
+                        (InitializedReservedKeyForUsi: CacheInitializationConstants.InitializationMarkerKeyForUsi,
+                            InitializedKeyForUniqueId: CacheInitializationConstants.InitializationMarkerKeyForUniqueId)
+                    })
+                .ToArray();
 
-                    var result = (await _personIdentifiersProvider.GetAllPersonIdentifiersAsync(
-                            personType,
-                            timeoutCancellationTokenSource.Token))
-                        .ToArray();
-
-                    if (_logger.IsDebugEnabled)
+            var usiByUniqueIdCacheEntries = result.Select(v => (v.UniqueId, v.Usi))
+                .Concat(
+                    new[]
                     {
-                        _logger.Debug($"Obtained {result.Length:N0} '{personType}' identifiers after {stopwatch?.ElapsedMilliseconds ?? 0:N0} ms...");
-                    }
+                        (InitializedKeyForUniqueId: CacheInitializationConstants.InitializationMarkerKeyForUniqueId,
+                            InitializedReservedKeyForUsi: CacheInitializationConstants.InitializationMarkerKeyForUsi)
+                    })
+                .ToArray();
 
-                    timeoutCancellationTokenSource.Token.ThrowIfCancellationRequested();
+            if (_logger.IsDebugEnabled)
+            {
+                _logger.Debug($"Setting '{personType}' map entries into cache for ODS instance '{odsInstanceHashId}'...");
+            }
 
-                    var uniqueIdByUsiCacheEntries = result.Select(v => (v.Usi, v.UniqueId))
-                        .Concat(
-                            new[]
-                            {
-                                (InitializedReservedKeyForUsi: CacheInitializationConstants.InitializationMarkerKeyForUsi,
-                                    InitializedKeyForUniqueId: CacheInitializationConstants.InitializationMarkerKeyForUniqueId)
-                            })
-                        .ToArray();
+            await Task.WhenAll(
+                _uniqueIdByUsiMapCache.SetMapEntriesAsync(
+                    (odsInstanceHashId, personType, PersonMapType.UniqueIdByUsi),
+                    uniqueIdByUsiCacheEntries),
+                _usiByUniqueIdMapCache.SetMapEntriesAsync(
+                    (odsInstanceHashId, personType, PersonMapType.UsiByUniqueId),
+                    usiByUniqueIdCacheEntries));
 
-                    var usiByUniqueIdCacheEntries = result.Select(v => (v.UniqueId, v.Usi))
-                        .Concat(
-                            new[]
-                            {
-                                (InitializedKeyForUniqueId: CacheInitializationConstants.InitializationMarkerKeyForUniqueId,
-                                    InitializedReservedKeyForUsi: CacheInitializationConstants.InitializationMarkerKeyForUsi)
-                            })
-                        .ToArray();
+            if (_logger.IsDebugEnabled)
+            {
+                stopwatch?.Stop();
+                _logger.Debug($"Completed background cache initialization of {uniqueIdByUsiCacheEntries.Length:N0} {personType} entries for ODS instance '{odsInstanceHashId}' in {stopwatch?.ElapsedMilliseconds ?? 0:N0} ms...");
+            }
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.Warn(
+                $"Background cache initialization of '{personType}' entries for ODS instance '{odsInstanceHashId}' exceeded the {InitializationTimeout.TotalSeconds:N0}-second timeout.",
+                ex);
 
-                    if (_logger.IsDebugEnabled)
-                    {
-                        _logger.Debug($"Setting '{personType}' map entries into cache for ODS instance '{odsInstanceHashId}'...");
-                    }
+            await ResetInitializationMarkerAsync(odsInstanceHashId, personType);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(
+                $"Unable to load '{personType}' mappings from ODS (with OdsInstanceHashId '{odsInstanceHashId}').",
+                ex);
 
-                    await Task.WhenAll(
-                        _uniqueIdByUsiMapCache.SetMapEntriesAsync(
-                            (odsInstanceHashId, personType, PersonMapType.UniqueIdByUsi),
-                            uniqueIdByUsiCacheEntries),
-                        _usiByUniqueIdMapCache.SetMapEntriesAsync(
-                            (odsInstanceHashId, personType, PersonMapType.UsiByUniqueId),
-                            usiByUniqueIdCacheEntries));
+            await ResetInitializationMarkerAsync(odsInstanceHashId, personType);
+        }
+        finally
+        {
+            try
+            {
+                await _distributedLockProvider.ReleaseLockAsync(lockKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(
+                    $"Exception occurred while releasing background initialization lock '{lockKey}' for ODS instance '{odsInstanceHashId}'.",
+                    ex);
+            }
+        }
+    }
 
-                    if (_logger.IsDebugEnabled)
-                    {
-                        stopwatch?.Stop();
-                        _logger.Debug($"Completed background cache initialization of {uniqueIdByUsiCacheEntries.Length:N0} {personType} entries for ODS instance '{odsInstanceHashId}' in {stopwatch?.ElapsedMilliseconds ?? 0:N0} ms...");
-                    }
-                }
-                catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-                {
-                    _logger.Warn(
-                        $"Background cache initialization of '{personType}' entries for ODS instance '{odsInstanceHashId}' exceeded the {InitializationTimeout.TotalSeconds:N0}-second timeout.",
-                        ex);
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error(
-                        $"Unable to load '{personType}' mappings from ODS (with OdsInstanceHashId '{odsInstanceHashId}').",
-                        ex);
-                }
-                finally
-                {
-                    try
-                    {
-                        await _distributedLockProvider.ReleaseLockAsync(lockKey);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error(
-                            $"Exception occurred while releasing background initialization lock '{lockKey}' for ODS instance '{odsInstanceHashId}'.",
-                            ex);
-                    }
-                }
-            },
-            CancellationToken.None);
+    private async Task ResetInitializationMarkerAsync(ulong odsInstanceHashId, string personType)
+    {
+        try
+        {
+            await Task.WhenAll(
+                _uniqueIdByUsiMapCache.SetMapEntriesAsync(
+                    (odsInstanceHashId, personType, PersonMapType.UniqueIdByUsi),
+                    new[] { (CacheInitializationConstants.InitializationMarkerKeyForUsi, default(string)) }),
+                _usiByUniqueIdMapCache.SetMapEntriesAsync(
+                    (odsInstanceHashId, personType, PersonMapType.UsiByUniqueId),
+                    new[] { (CacheInitializationConstants.InitializationMarkerKeyForUniqueId, default(int)) }));
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn(
+                $"Unable to clear cache initialization markers for '{personType}' in ODS instance '{odsInstanceHashId}'.",
+                ex);
+        }
     }
 }

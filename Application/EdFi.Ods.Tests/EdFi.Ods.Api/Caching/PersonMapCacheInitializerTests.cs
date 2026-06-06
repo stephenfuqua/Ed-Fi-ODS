@@ -78,7 +78,7 @@ public class PersonMapCacheInitializerTests
     }
 
     [Test]
-    public async Task InitializePersonMapAsync_ShouldNotSetAnyCacheMapEntriesOrThrowException_WhenIdentifierProviderFails()
+    public async Task InitializePersonMapAsync_ShouldResetInitializationMarkers_WhenIdentifierProviderFails()
     {
         // Arrange
         const string personType = "TestPerson";
@@ -103,15 +103,24 @@ public class PersonMapCacheInitializerTests
         await personMapCacheInitializer.InitializePersonMapAsync(odsInstanceHashId, personType, lockKey);
 
         // Assert
+        var uniqueIdByUsiTuple = (odsInstanceHashId, personType, PersonMapType.UniqueIdByUsi);
+        var usiByUniqueIdTuple = (odsInstanceHashId, personType, PersonMapType.UsiByUniqueId);
+
         A.CallTo(() => uniqueIdByUsiMapCache.SetMapEntriesAsync(
-                A<(ulong, string, PersonMapType)>.Ignored,
-                A<(int, string)[]>.Ignored))
-            .MustNotHaveHappened();
+                uniqueIdByUsiTuple,
+                A<(int, string)[]>.That.Matches(entries =>
+                    entries.Length == 1
+                    && entries[0].Item1 == CacheInitializationConstants.InitializationMarkerKeyForUsi
+                    && entries[0].Item2 == null)))
+            .MustHaveHappenedOnceExactly();
 
         A.CallTo(() => usiByUniqueIdMapCache.SetMapEntriesAsync(
-                A<(ulong, string, PersonMapType)>.Ignored,
-                A<(string, int)[]>.Ignored))
-            .MustNotHaveHappened();
+                usiByUniqueIdTuple,
+                A<(string, int)[]>.That.Matches(entries =>
+                    entries.Length == 1
+                    && entries[0].Item1 == CacheInitializationConstants.InitializationMarkerKeyForUniqueId
+                    && entries[0].Item2 == default)))
+            .MustHaveHappenedOnceExactly();
 
         A.CallTo(() => distributedLockProvider.ReleaseLockAsync(lockKey))
             .MustHaveHappenedOnceExactly();

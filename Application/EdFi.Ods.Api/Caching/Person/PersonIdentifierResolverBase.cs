@@ -32,7 +32,6 @@ public abstract class PersonIdentifierResolverBase<TLookup, TResolved>
     private readonly IDistributedLockProvider _distributedLockProvider;
     private readonly IContextProvider<OdsInstanceConfiguration> _odsInstanceConfigurationContextProvider;
     private readonly TLookup[] _cacheInitializationMarkerKeyForLookup;
-    private readonly TResolved[] _cacheInitializationMarkerKeyForResolved;
     private readonly ILog _logger;
     private readonly bool _performBackgroundInitialization;
 
@@ -56,7 +55,6 @@ public abstract class PersonIdentifierResolverBase<TLookup, TResolved>
         _cacheSuppressionByPersonType = cacheSuppressionByPersonType;
         _performBackgroundInitialization = !useProgressiveLoading;
         _cacheInitializationMarkerKeyForLookup = new[] { cacheInitializationMarkerKeyForLookupProvider.CacheKey };
-        _cacheInitializationMarkerKeyForResolved = new[] { cacheInitializationMarkerKeyForResolvedProvider.CacheKey };
     }
 
     protected abstract PersonMapType MapType { get; }
@@ -125,23 +123,23 @@ public abstract class PersonIdentifierResolverBase<TLookup, TResolved>
                 {
                     try
                     {
-                        await Task.WhenAll(
-                            _mapCache.SetMapEntriesAsync(
-                                (odsInstanceHashId, personType, MapType),
-                                new[] { (_cacheInitializationMarkerKeyForLookup[0], _cacheInitializationMarkerKeyForResolved[0]) }),
-                            _reverseMapCache.SetMapEntriesAsync(
-                                (odsInstanceHashId, personType, MapType.Inverse()),
-                                new[] { (_cacheInitializationMarkerKeyForResolved[0], _cacheInitializationMarkerKeyForLookup[0]) }));
-
-                        _ = _personMapCacheInitializer.InitializePersonMapAsync(
+                        var initializationTask = _personMapCacheInitializer.InitializePersonMapAsync(
                             odsInstanceHashId,
                             personType,
                             lockKey,
                             CancellationToken.None);
+
+                        _ = initializationTask.ContinueWith(
+                            t => _logger.Error(
+                                $"An error occurred while initializing the '{personType}' cache in the background for ODS instance '{odsInstanceHashId}'.",
+                                t.Exception),
+                            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
                     }
                     catch (Exception ex)
                     {
-                        _logger.Error("An error occurred while attempting to add the 'initialization' marker cache entry to the cache.", ex);
+                        _logger.Error(
+                            $"Unable to start background cache initialization for '{personType}' in ODS instance '{odsInstanceHashId}'.",
+                            ex);
 
                         try
                         {
@@ -149,10 +147,10 @@ public abstract class PersonIdentifierResolverBase<TLookup, TResolved>
                         }
                         catch (Exception releaseEx)
                         {
-                            _logger.Error($"An error occurred while releasing the Redis initialization lock '{lockKey}' after marker write failure.", releaseEx);
+                            _logger.Error(
+                                $"An error occurred while releasing the Redis initialization lock '{lockKey}' after failed start.",
+                                releaseEx);
                         }
-
-                        throw;
                     }
                 }
             }
