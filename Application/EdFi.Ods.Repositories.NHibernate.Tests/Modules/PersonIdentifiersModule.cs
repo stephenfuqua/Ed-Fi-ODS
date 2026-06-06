@@ -59,6 +59,10 @@ namespace EdFi.Ods.Repositories.NHibernate.Tests.Modules
 
             builder.RegisterType<PersonMapCacheInitializer>().As<IPersonMapCacheInitializer>().SingleInstance();
 
+            builder.RegisterType<InMemoryDistributedLockProvider>()
+                .As<IDistributedLockProvider>()
+                .SingleInstance();
+
             builder.RegisterType<PersonUniqueIdResolver>()
                 .WithParameter(new NamedParameter("cacheSuppressionByPersonType", cacheSuppression))
                 .As<IPersonUniqueIdResolver>()

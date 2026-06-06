@@ -148,3 +148,4 @@ environment.json
 
 # Nunit Test Reports (Pester)
 reportsNUnit/
+.claude/settings.local.json

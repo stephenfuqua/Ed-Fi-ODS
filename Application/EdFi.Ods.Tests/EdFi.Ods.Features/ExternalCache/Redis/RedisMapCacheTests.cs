@@ -30,7 +30,7 @@ public class RedisMapCacheTests
         A.CallTo(() => _redisConnectionProvider.Get()).Returns(_cache);
 
         _mapCache = A.Fake<RedisMapCache<string, string, string>>(opts =>
-            opts.WithArgumentsForConstructor(new object[] { _redisConnectionProvider, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(5) })
+            opts.WithArgumentsForConstructor(new object[] { _redisConnectionProvider, new RedisCacheResilience(), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(5) })
                 .CallsBaseMethods());
     }
 
@@ -136,7 +136,7 @@ public class RedisMapCacheTests
         string key = "test-key"; // Using string for TKey
         short mapKey = 456; // Using short for TMapKey
         var mapCache = A.Fake<RedisMapCache<string, short, string>>(opts =>
-            opts.WithArgumentsForConstructor(new object[] { _redisConnectionProvider, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(5) })
+            opts.WithArgumentsForConstructor(new object[] { _redisConnectionProvider, new RedisCacheResilience(), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(5) })
                 .CallsBaseMethods());
 
         // Act
@@ -223,7 +223,7 @@ public class RedisMapCacheExpirationTests
         A.CallTo(() => _redisConnectionProvider.Get()).Returns(_cache);
 
         _mapCache = A.Fake<RedisMapCache<string, string, string>>(opts =>
-            opts.WithArgumentsForConstructor([_redisConnectionProvider, _absoluteExpirationPeriod, _slidingExpirationPeriod])
+            opts.WithArgumentsForConstructor([_redisConnectionProvider, new RedisCacheResilience(), _absoluteExpirationPeriod, _slidingExpirationPeriod])
                 .CallsBaseMethods());
     }
 

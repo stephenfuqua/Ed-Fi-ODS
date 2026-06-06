@@ -30,9 +30,8 @@ public class RedisNotificationsModule : ConditionalModule
     protected override void ApplyConfigurationSpecificRegistrations(ContainerBuilder builder)
     {
         // Ensure the Redis connection provider is registered (it may be registered by other conditional modules as well)
-        builder.RegisterType<RedisConnectionProvider>()
+        builder.Register(_ => new RedisConnectionProvider(_apiSettings.Services.Redis))
             .As<IRedisConnectionProvider>()
-            .WithParameter(new NamedParameter("configuration", _apiSettings.Services.Redis.Configuration))
             .IfNotRegistered(typeof(IRedisConnectionProvider))
             .SingleInstance();
 
