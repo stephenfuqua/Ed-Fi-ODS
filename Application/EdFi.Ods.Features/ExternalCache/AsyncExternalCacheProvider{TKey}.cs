@@ -67,7 +67,7 @@ public class AsyncExternalCacheProvider<TKey> : IAsyncCacheProvider<TKey>
         catch (Exception ex)
         {
             _logger.Error(ex);
-            throw new DistributedCacheException(DefaultExceptionMessage, ex);
+            return (false, null);
         }
     }
 

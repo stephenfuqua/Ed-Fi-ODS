@@ -111,4 +111,35 @@ public class TieredCacheProviderTests
         // Assert
         found.ShouldBeFalse();
     }
+
+    [Test]
+    public void Clear_ShouldNotRemoveUnrelatedEntries_FromSharedMemoryCache()
+    {
+        // Arrange
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var distributedCacheProvider = A.Fake<ICacheProvider<string>>();
+        memoryCache.Set("unrelated-key", "unrelated-value");
+
+        object missingValue = null;
+
+        A.CallTo(() => distributedCacheProvider.TryGetCachedObject("cache-key", out missingValue))
+            .Returns(false);
+
+        var tieredCacheProvider = new global::EdFi.Ods.Features.ExternalCache.TieredCacheProvider<string>(
+            memoryCache,
+            distributedCacheProvider,
+            TimeSpan.FromMinutes(1));
+
+        tieredCacheProvider.SetCachedObject("cache-key", "cached-value");
+
+        // Act
+        tieredCacheProvider.Clear();
+        var foundTieredEntry = tieredCacheProvider.TryGetCachedObject("cache-key", out _);
+        var foundUnrelatedEntry = memoryCache.TryGetValue("unrelated-key", out var unrelatedValue);
+
+        // Assert
+        foundTieredEntry.ShouldBeFalse();
+        foundUnrelatedEntry.ShouldBeTrue();
+        unrelatedValue.ShouldBe("unrelated-value");
+    }
 }

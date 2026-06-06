@@ -4,9 +4,11 @@
 // See the LICENSE and NOTICES files in the project root for more information.
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using EdFi.Ods.Common.Caching;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
 
 namespace EdFi.Ods.Features.ExternalCache;
 
@@ -22,6 +24,8 @@ public class TieredCacheProvider<TKey> : ICacheProvider<TKey>, IAsyncCacheProvid
     private readonly ICacheProvider<TKey> _distributedCacheProvider;
     private readonly IAsyncCacheProvider<TKey> _asyncDistributedCacheProvider;
     private readonly TimeSpan _l1CacheDuration;
+    private readonly object _clearSync = new();
+    private CancellationTokenSource _clearTokenSource = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TieredCacheProvider{TKey}"/> class.
@@ -139,14 +143,15 @@ public class TieredCacheProvider<TKey> : ICacheProvider<TKey>, IAsyncCacheProvid
     /// <inheritdoc />
     public void Clear()
     {
-        if (_memoryCache is MemoryCache memoryCache)
+        CancellationTokenSource tokenSourceToCancel;
+
+        lock (_clearSync)
         {
-            memoryCache.Compact(1.0);
-            return;
+            tokenSourceToCancel = _clearTokenSource;
+            _clearTokenSource = new CancellationTokenSource();
         }
 
-        throw new NotSupportedException(
-            $"Unable to clear the {nameof(TieredCacheProvider<TKey>)} because the registered {nameof(IMemoryCache)} does not support compaction.");
+        tokenSourceToCancel.Cancel();
     }
 
     private (bool found, object value) TryGetCachedObjectUsingSynchronousProvider(TKey key)
@@ -183,6 +188,7 @@ public class TieredCacheProvider<TKey> : ICacheProvider<TKey>, IAsyncCacheProvid
             entryOptions.AbsoluteExpiration = DateTimeOffset.MaxValue;
         }
 
+        entryOptions.AddExpirationToken(new CancellationChangeToken(_clearTokenSource.Token));
         _memoryCache.Set(key, value ?? NullValue, entryOptions);
     }
 }
