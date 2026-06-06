@@ -154,6 +154,10 @@ public abstract class ExternalCacheModule : ConditionalModule, IExternalCacheMod
                 .SingleInstance();
 
             builder.RegisterType<RedisDistributedLockProvider>()
+                .WithParameter(
+                    new ResolvedParameter(
+                        (p, c) => p.ParameterType == typeof(RedisCacheResilience),
+                        (_, c) => c.Resolve<RedisCacheResilience>()))
                 .As<IDistributedLockProvider>()
                 .SingleInstance();
 

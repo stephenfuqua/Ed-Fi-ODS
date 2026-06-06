@@ -21,6 +21,7 @@ public class RedisDistributedLockProviderTests
 {
     private IRedisConnectionProvider _redisConnectionProvider;
     private IDatabase _database;
+    private RedisCacheResilience _resilience;
     private RedisDistributedLockProvider _provider;
 
     [SetUp]
@@ -28,6 +29,7 @@ public class RedisDistributedLockProviderTests
     {
         _redisConnectionProvider = A.Fake<IRedisConnectionProvider>();
         _database = A.Fake<IDatabase>();
+        _resilience = new RedisCacheResilience();
 
         // Mock the Multiplexer and server for script loading in the constructor
         var multiplexer = A.Fake<IConnectionMultiplexer>();
@@ -41,7 +43,7 @@ public class RedisDistributedLockProviderTests
             .Returns(new byte[] { 1, 2, 3 });
         A.CallTo(() => _redisConnectionProvider.Get()).Returns(_database);
 
-        _provider = new RedisDistributedLockProvider(_redisConnectionProvider);
+        _provider = new RedisDistributedLockProvider(_redisConnectionProvider, _resilience);
     }
 
     [Test]
