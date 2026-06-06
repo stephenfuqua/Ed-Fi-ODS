@@ -142,7 +142,16 @@ public abstract class PersonIdentifierResolverBase<TLookup, TResolved>
                     catch (Exception ex)
                     {
                         _logger.Error("An error occurred while attempting to add the 'initialization' marker cache entry to the cache.", ex);
-                        await _distributedLockProvider.ReleaseLockAsync(lockKey);
+
+                        try
+                        {
+                            await _distributedLockProvider.ReleaseLockAsync(lockKey);
+                        }
+                        catch (Exception releaseEx)
+                        {
+                            _logger.Error($"An error occurred while releasing the Redis initialization lock '{lockKey}' after marker write failure.", releaseEx);
+                        }
+
                         throw;
                     }
                 }
