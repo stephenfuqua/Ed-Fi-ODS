@@ -92,6 +92,24 @@ The following defects were identified through code analysis (source: issue #1343
 | FR-CONN-2 | Default values SHALL be production-friendly: syncTimeout=10000ms, asyncTimeout=10000ms, connectTimeout=10000ms, connectRetry=5, abortOnConnectFail=false, keepAlive=30s. | SHALL |
 | FR-CONN-3 | Connection options SHALL be applied consistently to both the `IRedisConnectionProvider` and the `IDistributedCache` Redis registrations. | SHALL |
 
+### Redis Configuration Reference
+
+`ApiSettings:Services:Redis` supports the following settings:
+
+```json
+"Redis": {
+  "Configuration": "",
+  "SyncTimeoutMs": 10000,
+  "AsyncTimeoutMs": 10000,
+  "ConnectTimeoutMs": 10000,
+  "ConnectRetry": 5,
+  "AbortOnConnectFail": false,
+  "KeepAliveSeconds": 30,
+  "Ssl": false,
+  "Password": ""
+}
+```
+
 ### FR-RESIL: Connection Resilience
 
 | ID | Requirement | Priority |
