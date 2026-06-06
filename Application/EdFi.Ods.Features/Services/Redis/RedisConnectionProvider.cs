@@ -30,10 +30,7 @@ public class RedisConnectionProvider : IRedisConnectionProvider
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="redisConfiguration"/> is null.</exception>
     public RedisConnectionProvider(RedisConfiguration redisConfiguration)
     {
-        if (redisConfiguration is null)
-        {
-            throw new ArgumentNullException(nameof(redisConfiguration));
-        }
+        ArgumentNullException.ThrowIfNull(redisConfiguration);
 
         _configurationOptions = CreateConfigurationOptions(redisConfiguration);
     }
@@ -49,14 +46,16 @@ public class RedisConnectionProvider : IRedisConnectionProvider
         return _cache;
     }
 
-    internal static ConfigurationOptions CreateConfigurationOptions(RedisConfiguration redisConfiguration)
+    internal static ConfigurationOptions CreateConfigurationOptions(
+        RedisConfiguration redisConfiguration
+    )
     {
-        if (redisConfiguration is null)
-        {
-            throw new ArgumentNullException(nameof(redisConfiguration));
-        }
+        ArgumentNullException.ThrowIfNull(redisConfiguration);
 
-        var configurationOptions = ConfigurationOptions.Parse(redisConfiguration.Configuration ?? "localhost");
+        // Deliberately falling back to an empty string below rather than defaulting to potentially insecure localhost
+        var configurationOptions = ConfigurationOptions.Parse(
+            redisConfiguration.Configuration ?? string.Empty
+        );
         configurationOptions.SyncTimeout = redisConfiguration.SyncTimeoutMs;
         configurationOptions.AsyncTimeout = redisConfiguration.AsyncTimeoutMs;
         configurationOptions.ConnectTimeout = redisConfiguration.ConnectTimeoutMs;
@@ -112,7 +111,8 @@ public class RedisConnectionProvider : IRedisConnectionProvider
 
         _logger.Error(
             $"Redis connection failed. Endpoint: {args.EndPoint}, FailureType: {args.FailureType}, ConnectionType: {args.ConnectionType}.",
-            args.Exception);
+            args.Exception
+        );
     }
 
     private void OnConnectionRestored(object sender, ConnectionFailedEventArgs args)
@@ -120,7 +120,8 @@ public class RedisConnectionProvider : IRedisConnectionProvider
         IsConnected = true;
 
         _logger.Info(
-            $"Redis connection restored. Endpoint: {args.EndPoint}, FailureType: {args.FailureType}, ConnectionType: {args.ConnectionType}.");
+            $"Redis connection restored. Endpoint: {args.EndPoint}, FailureType: {args.FailureType}, ConnectionType: {args.ConnectionType}."
+        );
     }
 
     private void OnErrorMessage(object sender, RedisErrorEventArgs args)
