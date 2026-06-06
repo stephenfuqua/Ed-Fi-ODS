@@ -89,7 +89,8 @@ public class AsyncCachingInterceptorTests
 
         result.ShouldBe("cached-result");
         A.CallTo(() => invocation.Proceed()).MustNotHaveHappened();
-        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<ulong>._, out _)).MustNotHaveHappened();
+        object outValue = null!;
+        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<ulong>._, out outValue)).MustNotHaveHappened();
     }
 
     [Test]
