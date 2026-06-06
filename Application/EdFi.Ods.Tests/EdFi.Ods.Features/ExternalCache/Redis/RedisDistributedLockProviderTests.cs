@@ -6,11 +6,15 @@
 using System;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using EdFi.Ods.Features.ExternalCache.Redis;
 using EdFi.Ods.Features.Services.Redis;
 using FakeItEasy;
 using NUnit.Framework;
+using NUnit.Framework.Internal;
+using Polly;
+using Polly.CircuitBreaker;
 using Shouldly;
 using StackExchange.Redis;
 
@@ -179,5 +183,257 @@ public class RedisDistributedLockProviderTests
         );
 
         exception.ParamName.ShouldBe("lockKey");
+    }
+
+    [Test]
+    public async Task TryAcquireLockAsync_ShouldReturnFalse_WhenRedisThrowsConnectionException()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Throws(new RedisConnectionException(ConnectionFailureType.SocketClosed, "Connection failed"));
+
+        var result = await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        result.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task TryAcquireLockAsync_ShouldReturnFalse_WhenRedisThrowsTimeoutException()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Throws(new TimeoutException());
+
+        var result = await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        result.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task TryAcquireLockAsync_ShouldReturnFalse_WhenRedisThrowsOperationCanceledException()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Throws(new OperationCanceledException());
+
+        var result = await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        result.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task TryAcquireLockAsync_ShouldReturnFalse_WhenRedisUnavailable()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Throws(new Exception("Connection to Redis unavailable"));
+
+        var result = await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        result.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task ReleaseLockAsync_ShouldNotThrow_WhenRedisThrowsConnectionException()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        // First acquire lock
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Returns(true);
+
+        await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        // Then configure release to throw
+        A.CallTo(() =>
+                _database.ScriptEvaluateAsync(
+                    A<byte[]>._,
+                    A<RedisKey[]>._,
+                    A<RedisValue[]>._,
+                    CommandFlags.None
+                )
+            )
+            .Throws(new RedisConnectionException(ConnectionFailureType.SocketClosed, "Connection failed"));
+
+        // Should not throw
+        var threwException = false;
+        try
+        {
+            await _provider.ReleaseLockAsync(lockKey);
+        }
+        catch
+        {
+            threwException = true;
+        }
+
+        threwException.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task ReleaseLockAsync_ShouldNotThrow_WhenRedisThrowsTimeoutException()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        // First acquire lock
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Returns(true);
+
+        await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        // Then configure release to throw
+        A.CallTo(() =>
+                _database.ScriptEvaluateAsync(
+                    A<byte[]>._,
+                    A<RedisKey[]>._,
+                    A<RedisValue[]>._,
+                    CommandFlags.None
+                )
+            )
+            .Throws(new TimeoutException());
+
+        // Should not throw
+        var threwException = false;
+        try
+        {
+            await _provider.ReleaseLockAsync(lockKey);
+        }
+        catch
+        {
+            threwException = true;
+        }
+
+        threwException.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task ReleaseLockAsync_ShouldNotThrow_WhenRedisUnavailable()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        // First acquire lock
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Returns(true);
+
+        await _provider.TryAcquireLockAsync(lockKey, expiration);
+
+        // Then configure release to throw
+        A.CallTo(() =>
+                _database.ScriptEvaluateAsync(
+                    A<byte[]>._,
+                    A<RedisKey[]>._,
+                    A<RedisValue[]>._,
+                    CommandFlags.None
+                )
+            )
+            .Throws(new Exception("Redis unavailable"));
+
+        // Should not throw
+        var threwException = false;
+        try
+        {
+            await _provider.ReleaseLockAsync(lockKey);
+        }
+        catch
+        {
+            threwException = true;
+        }
+
+        threwException.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task TryAcquireLockAsync_ShouldReturnFalse_WhenCircuitBreakerIsOpen()
+    {
+        const string lockKey = "cache-init-lock";
+        var expiration = TimeSpan.FromSeconds(30);
+
+        // Create a resilience policy with a low failure threshold (requires at least 2 minimum throughput for Polly)
+        var brokenCircuitResilience = new RedisCacheResilience(failureThreshold: 2, breakDurationSeconds: 30);
+        var testProvider = new RedisDistributedLockProvider(_redisConnectionProvider, brokenCircuitResilience);
+
+        // Configure database to always fail
+        A.CallTo(() =>
+                _database.StringSetAsync(
+                    lockKey,
+                    A<RedisValue>.That.Matches(v => !string.IsNullOrEmpty(v)),
+                    expiration,
+                    When.NotExists
+                )
+            )
+            .Throws(new RedisConnectionException(ConnectionFailureType.SocketClosed, "Connection failed"));
+
+        // Trigger multiple failures to open the circuit
+        for (int i = 0; i < 5; i++)
+        {
+            await testProvider.TryAcquireLockAsync(lockKey, expiration);
+        }
+
+        // Wait a moment for the circuit to process
+        await Task.Delay(100);
+
+        // Now the circuit should be open; attempt to acquire should return false
+        var result = await testProvider.TryAcquireLockAsync(lockKey, expiration);
+
+        result.ShouldBeFalse();
     }
 }
