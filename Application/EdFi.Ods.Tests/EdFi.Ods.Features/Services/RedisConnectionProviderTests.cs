@@ -18,7 +18,7 @@ public class RedisConnectionProviderTests
     public void Constructor_WhenRedisConfigurationIsNull_ThrowsArgumentNullException()
     {
         // Arrange, Act, Assert
-        var ex = Should.Throw<ArgumentNullException>(() => new RedisConnectionProvider(null));
+        var ex = Should.Throw<ArgumentNullException>(() => new RedisConnectionProvider((RedisConfiguration)null));
         ex.ParamName.ShouldBe("redisConfiguration");
     }
 
