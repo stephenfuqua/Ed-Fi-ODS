@@ -2,10 +2,10 @@
 // Copyright (c) Ed-Fi Alliance, LLC and Contributors.
 
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Castle.DynamicProxy;
 using EdFi.Ods.Common.Caching;
-using EdFi.Ods.Common.Exceptions;
 using FakeItEasy;
 using NUnit.Framework;
 using Shouldly;
@@ -18,89 +18,89 @@ public class AsyncCachingInterceptorTests
     [Test]
     public void Intercept_SyncMethod_ShouldReturnFromL1Cache_WhenPresent()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.GetData));
 
         object cachedValue = "cached-l1";
-        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<object>._, out cachedValue)).Returns(true);
+        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<ulong>._, out cachedValue)).Returns(true);
 
         interceptor.Intercept(invocation);
 
         invocation.ReturnValue.ShouldBe(cachedValue);
         A.CallTo(() => invocation.Proceed()).MustNotHaveHappened();
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).MustNotHaveHappened();
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).MustNotHaveHappened();
     }
 
     [Test]
     public void Intercept_SyncMethod_ShouldFallbackToAsyncProvider_WhenL1Misses()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.GetData));
 
         object ignored = null!;
-        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<object>._, out ignored)).Returns(false);
+        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<ulong>._, out ignored)).Returns(false);
 
         var cachedValue = "cached-l2";
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).Returns((true, (object) cachedValue));
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).Returns((true, (object) cachedValue));
 
         interceptor.Intercept(invocation);
 
         invocation.ReturnValue.ShouldBe(cachedValue);
         A.CallTo(() => invocation.Proceed()).MustNotHaveHappened();
-        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<object>._, A<object>._)).MustNotHaveHappened();
+        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<ulong>._, A<object>._)).MustNotHaveHappened();
     }
 
     [Test]
     public void Intercept_SyncMethod_ShouldProceedAndCache_WhenBothMiss()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.GetData));
 
         object ignored = null!;
-        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<object>._, out ignored)).Returns(false);
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).Returns((false, null!));
+        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<ulong>._, out ignored)).Returns(false);
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).Returns((false, null!));
         A.CallTo(() => invocation.Proceed()).Invokes(() => invocation.ReturnValue = "from-target");
 
         interceptor.Intercept(invocation);
 
         invocation.ReturnValue.ShouldBe("from-target");
         A.CallTo(() => invocation.Proceed()).MustHaveHappenedOnceExactly();
-        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<object>._, "from-target")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<ulong>._, "from-target")).MustHaveHappenedOnceExactly();
     }
 
     [Test]
     public async Task Intercept_AsyncTaskOfT_ShouldReturnCachedValue()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.GetDataAsync));
 
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).Returns((true, (object) "cached-result"));
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).Returns((true, (object) "cached-result"));
 
         interceptor.Intercept(invocation);
         var result = await (Task<string>) invocation.ReturnValue;
 
         result.ShouldBe("cached-result");
         A.CallTo(() => invocation.Proceed()).MustNotHaveHappened();
-        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<object>._, out _)).MustNotHaveHappened();
+        A.CallTo(() => localCacheProvider.TryGetCachedObject(A<ulong>._, out _)).MustNotHaveHappened();
     }
 
     [Test]
     public async Task Intercept_AsyncTaskOfT_ShouldProceedAndCache_WhenMiss()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.GetDataAsync));
 
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).Returns((false, null!));
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).Returns((false, null!));
         A.CallTo(() => invocation.Proceed()).Invokes(() => invocation.ReturnValue = Task.FromResult("from-target"));
 
         interceptor.Intercept(invocation);
@@ -108,52 +108,53 @@ public class AsyncCachingInterceptorTests
 
         result.ShouldBe("from-target");
         A.CallTo(() => invocation.Proceed()).MustHaveHappenedOnceExactly();
-        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<object>._, "from-target")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<ulong>._, "from-target")).MustHaveHappenedOnceExactly();
     }
 
     [Test]
     public async Task Intercept_AsyncTask_ShouldSkipExecution_WhenCached()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.ExecuteOperationAsync));
 
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).Returns((true, (object) AsyncCachingInterceptor<object>.AsyncVoidTaskMarker));
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).Returns((true, (object) "marker"));
 
         interceptor.Intercept(invocation);
         await (Task) invocation.ReturnValue;
 
         A.CallTo(() => invocation.Proceed()).MustNotHaveHappened();
-        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<object>._, A<object>._)).MustNotHaveHappened();
+        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<ulong>._, A<object>._)).MustNotHaveHappened();
     }
 
     [Test]
     public async Task Intercept_AsyncTask_ShouldProceedAndCache_WhenMiss()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = CreateInvocation(nameof(ISampleService.ExecuteOperationAsync));
 
-        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<object>._)).Returns((false, null!));
+        A.CallTo(() => asyncCacheProvider.TryGetCachedObjectAsync(A<ulong>._)).Returns((false, null!));
         A.CallTo(() => invocation.Proceed()).Invokes(() => invocation.ReturnValue = Task.CompletedTask);
 
         interceptor.Intercept(invocation);
         await (Task) invocation.ReturnValue;
 
         A.CallTo(() => invocation.Proceed()).MustHaveHappenedOnceExactly();
-        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<object>._, AsyncCachingInterceptor<object>.AsyncVoidTaskMarker)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => asyncCacheProvider.SetCachedObjectAsync(A<ulong>._, A<object>.That.Matches(v => Equals(v, 1))))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Test]
     public void Intercept_ShouldThrowCacheKeyGenerationException_WhenNoDeclaringType()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
         var invocation = A.Fake<IInvocation>();
-        var method = A.Fake<System.Reflection.MethodInfo>();
+        var method = A.Fake<MethodInfo>();
 
         A.CallTo(() => invocation.Method).Returns(method);
         A.CallTo(() => invocation.Arguments).Returns(Array.Empty<object>());
@@ -161,18 +162,31 @@ public class AsyncCachingInterceptorTests
         A.CallTo(() => method.DeclaringType).Returns(null);
         A.CallTo(() => method.Name).Returns("TestMethod");
 
-        var act = () => interceptor.Intercept(invocation);
-
-        var exception = act.ShouldThrow<CachingInterceptorCacheKeyGenerationException>();
-        exception.Message.ShouldContain("Cannot generated a cache key for invocation with method 'TestMethod' because it has no DeclaringType.");
+        var exception = Should.Throw<CachingInterceptorCacheKeyGenerationException>(() => interceptor.Intercept(invocation));
+        exception.Message.ShouldContain("Cache key generation failed for invocation of method 'TestMethod'");
+        exception.InnerException.ShouldBeOfType<NotSupportedException>();
+        exception.InnerException.Message.ShouldBe("Unable to generate a cache key for method 'TestMethod' because it has no DeclaringType.");
     }
 
     [Test]
-    public void Clear_ShouldClearBothProviders()
+    public void Intercept_ShouldThrowCacheKeyGenerationException_WhenMethodHasMoreThanThreeArguments()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>(options => options.Implements(typeof(IClearable)));
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>(options => options.Implements(typeof(IClearable)));
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
+        var invocation = CreateInvocation(nameof(ISampleService.GetDataWithFourArgs), "a", 1, 2, "b");
+
+        var exception = Should.Throw<CachingInterceptorCacheKeyGenerationException>(() => interceptor.Intercept(invocation));
+        exception.InnerException.ShouldBeOfType<NotImplementedException>();
+        exception.InnerException.Message.ShouldBe("Support for generating cache keys for more than 3 arguments has not been implemented.");
+    }
+
+    [Test]
+    public void Clear_ShouldClearLocalAndAsyncProviders_WhenBothAreClearable()
+    {
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>(options => options.Implements(typeof(IClearable)));
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>(options => options.Implements(typeof(IClearable)));
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
 
         interceptor.Clear();
 
@@ -181,23 +195,32 @@ public class AsyncCachingInterceptorTests
     }
 
     [Test]
-    public void Clear_ShouldThrow_WhenNeitherProviderIsClearable()
+    public void Clear_ShouldNotDoubleClear_WhenProvidersAreSameInstance()
     {
-        var localCacheProvider = A.Fake<ICacheProvider<object>>();
-        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<object>>();
-        var interceptor = new AsyncCachingInterceptor<object>(localCacheProvider, asyncCacheProvider);
+        var sharedCacheProvider = A.Fake<ITieredCacheProvider>();
+        var interceptor = new AsyncCachingInterceptor(sharedCacheProvider, sharedCacheProvider);
 
-        var act = () => interceptor.Clear();
+        interceptor.Clear();
 
-        var exception = act.ShouldThrow<NotSupportedException>();
-        exception.Message.ShouldBe("Neither underlying cache provider supports cache clearing.");
+        A.CallTo(() => ((IClearable) sharedCacheProvider).Clear()).MustHaveHappenedOnceExactly();
     }
 
-    private static IInvocation CreateInvocation(string methodName)
+    [Test]
+    public void Clear_ShouldThrow_WhenNeitherProviderIsClearable()
+    {
+        var localCacheProvider = A.Fake<ICacheProvider<ulong>>();
+        var asyncCacheProvider = A.Fake<IAsyncCacheProvider<ulong>>();
+        var interceptor = new AsyncCachingInterceptor(asyncCacheProvider, localCacheProvider);
+
+        var exception = Should.Throw<NotSupportedException>(() => interceptor.Clear());
+        exception.Message.ShouldBe("Unable to clear the underlying data associated with the AsyncCachingInterceptor.");
+    }
+
+    private static IInvocation CreateInvocation(string methodName, params object[] arguments)
     {
         var invocation = A.Fake<IInvocation>();
         A.CallTo(() => invocation.Method).Returns(typeof(ISampleService).GetMethod(methodName)!);
-        A.CallTo(() => invocation.Arguments).Returns(Array.Empty<object>());
+        A.CallTo(() => invocation.Arguments).Returns(arguments);
         return invocation;
     }
 
@@ -206,5 +229,8 @@ public class AsyncCachingInterceptorTests
         string GetData();
         Task<string> GetDataAsync();
         Task ExecuteOperationAsync();
+        string GetDataWithFourArgs(string value1, int value2, int value3, string value4);
     }
+
+    private interface ITieredCacheProvider : ICacheProvider<ulong>, IAsyncCacheProvider<ulong>, IClearable;
 }
